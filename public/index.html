@@ -93,6 +93,8 @@
          FAVICON
     ====================================================== -->
 
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
     <link
         rel="icon"
         type="image/svg+xml"
@@ -3575,6 +3577,10 @@
                 Security
             </a>
 
+            <a href="/dragon.html" aria-label="Open the TrueAegis Dragon experience">
+                🐉 Dragon
+            </a>
+
         </nav>
 
 
@@ -4382,6 +4388,7 @@
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2Z"/><path d="m22 6-10 7L2 6"/></svg>
                                 <input id="loginEmail" name="email" type="email" placeholder="example@gmail.com" autocomplete="email" required>
                             </div>
+                            <div id="loginEmailError" class="field-error" role="alert"></div>
                         </div>
 
                         <div class="login-input-group">
@@ -4391,6 +4398,7 @@
                                 <input id="loginPassword" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required>
                                 <button type="button" class="login-show-password" onclick="togglePassword('loginPassword', this)">SHOW</button>
                             </div>
+                            <div id="loginPasswordError" class="field-error" role="alert"></div>
                         </div>
 
                         <div class="login-input-group">
@@ -4560,6 +4568,10 @@
                     "
                 >
                     📰 News Analysis
+                </button>
+
+                <button class="sidebar-button" type="button" onclick="openDragonExperience()">
+                    🐉 Dragon Experience
                 </button>
 
 
@@ -6437,18 +6449,58 @@ Clearly distinguish:
             }
         }
 
+        let googleLoginInProgress = false;
+
         function startGoogleSignIn() {
-            showMessage(
-                "loginMessage",
-                "Google Sign-In UI is ready, but OAuth must be configured server-side before it can authenticate users.",
-                "info"
-            );
+            if (googleLoginInProgress) return;
+            googleLoginInProgress = true;
+            const button = document.querySelector(".google-login-button");
+            if (button) {
+                button.disabled = true;
+                button.setAttribute("aria-busy", "true");
+                button.textContent = "Connecting to Google…";
+            }
+            clearMessage("loginMessage");
+            window.location.assign("/api/auth/google");
+        }
+
+        function openDragonExperience() {
+            window.location.href = "/dragon.html";
         }
 
 
         /* =====================================================
            LOGIN
         ===================================================== */
+
+        function setLoginFieldState(inputId, errorId, message, valid) {
+            const input=document.getElementById(inputId);
+            const error=document.getElementById(errorId);
+            const wrap=input?.closest(".login-input-wrap");
+            if(!input||!error||!wrap) return valid;
+            wrap.classList.toggle("input-invalid",!valid);
+            wrap.classList.toggle("input-valid",valid && Boolean(input.value.trim()));
+            error.textContent=message||"";
+            error.classList.toggle("visible",!valid && Boolean(message));
+            input.setAttribute("aria-invalid",String(!valid));
+            return valid;
+        }
+        function validateLoginEmail(show=true) {
+            const input=document.getElementById("loginEmail"); const value=input?.value.trim().toLowerCase()||"";
+            if(!value) return setLoginFieldState("loginEmail","loginEmailError",show?"Email address is required.":"",false);
+            const valid=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+            return setLoginFieldState("loginEmail","loginEmailError",valid?"":"Enter a valid email address.",valid);
+        }
+        function validateLoginPassword(show=true) {
+            const input=document.getElementById("loginPassword"); const value=input?.value||""; const valid=value.length>=8;
+            return setLoginFieldState("loginPassword","loginPasswordError",valid?"":(show?"Password must be at least 8 characters.":""),valid);
+        }
+        function setupLoginValidation() {
+            document.getElementById("loginEmail")?.addEventListener("input",()=>validateLoginEmail(true));
+            document.getElementById("loginEmail")?.addEventListener("blur",()=>validateLoginEmail(true));
+            document.getElementById("loginPassword")?.addEventListener("input",()=>validateLoginPassword(true));
+            document.getElementById("loginPassword")?.addEventListener("blur",()=>validateLoginPassword(true));
+        }
 
         document
             .getElementById(
@@ -6490,19 +6542,11 @@ Clearly distinguish:
                     .value;
 
 
-            if (
-                !email ||
-                !password
-            ) {
-
-                showMessage(
-                    "loginMessage",
-                    "Email and password are required.",
-                    "error"
-                );
-
+            const validEmail = validateLoginEmail(true);
+            const validPassword = validateLoginPassword(true);
+            if (!validEmail || !validPassword) {
+                showMessage("loginMessage", "Please fix the highlighted fields and try again.", "error");
                 return;
-
             }
 
 
@@ -7695,6 +7739,16 @@ Clearly distinguish:
         }
 
 
+        function handleGoogleCallbackState() {
+            const params=new URLSearchParams(window.location.search);
+            const state=params.get("google");
+            if(!state) return;
+            const message=params.get("message");
+            window.history.replaceState({},document.title,window.location.pathname);
+            if(state === "success") showDashboard();
+            else { showPage("loginPage"); showMessage("loginMessage",message||"Google sign-in could not be completed. Please try again.","error"); }
+        }
+
         /* =====================================================
            INITIAL PAGE
         ===================================================== */
@@ -7750,6 +7804,9 @@ Clearly distinguish:
             try {
                 if (typeof initializeLoginPreferences === "function") {
                     initializeLoginPreferences();
+                }
+                if (typeof setupLoginValidation === "function") {
+                    setupLoginValidation();
                 }
 
                 setProgress(8);
@@ -7827,8 +7884,9 @@ Clearly distinguish:
 
         /* Start as soon as the document is ready; do not depend on the window load event. */
         if (document.readyState === "loading") {
-            document.addEventListener("DOMContentLoaded", runTrueAegisStartup, { once: true });
+            document.addEventListener("DOMContentLoaded", () => { handleGoogleCallbackState(); runTrueAegisStartup(); }, { once: true });
         } else {
+            handleGoogleCallbackState();
             runTrueAegisStartup();
         }
 

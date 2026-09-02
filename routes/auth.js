@@ -7,6 +7,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const { OAuth2Client } = require("google-auth-library");
 
 const User = require("../modules/user");
 
@@ -16,23 +17,23 @@ const router = express.Router();
 // CONFIGURATION
 // ============================================================
 
-const OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
-const RESET_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
+const OTP_EXPIRY_MS = 5 * 60 * 1000;
+const RESET_EXPIRY_MS = 15 * 60 * 1000;
+
+// ============================================================
+// GOOGLE AUTHENTICATION
+// ============================================================
+
+const googleClient = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID
+);
 
 // ============================================================
 // EMAIL TRANSPORTER
 // ============================================================
-//
-// .env should contain:
-//
-// GMAIL_USER=yourgmail@gmail.com
-// GMAIL_APP_PASSWORD=your-app-password
-//
-// ============================================================
 
 const transporter = nodemailer.createTransport({
     service: "gmail",
-
     auth: {
         user: process.env.GMAIL_USER,
         pass: process.env.GMAIL_APP_PASSWORD
@@ -40,7 +41,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // ============================================================
-// HELPER: NORMALIZE EMAIL
+// HELPERS
 // ============================================================
 
 function normalizeEmail(email) {
@@ -49,244 +50,177 @@ function normalizeEmail(email) {
         .toLowerCase();
 }
 
-// ============================================================
-// HELPER: GENERATE OTP
-// ============================================================
-
 function generateOTP() {
     return crypto
         .randomInt(100000, 1000000)
         .toString();
 }
 
+function publicUser(user) {
+    return {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        age: user.age,
+        language: user.language,
+        verified: user.verified,
+        authProvider: user.authProvider || "local"
+    };
+}
+
 // ============================================================
-// HELPER: SEND VERIFICATION EMAIL
+// SEND EMAIL
+// ============================================================
+
+async function sendEmail(options) {
+    if (
+        !process.env.GMAIL_USER ||
+        !process.env.GMAIL_APP_PASSWORD
+    ) {
+        throw new Error(
+            "Gmail email configuration is missing."
+        );
+    }
+
+    return transporter.sendMail({
+        from: process.env.GMAIL_USER,
+        ...options
+    });
+}
+
+// ============================================================
+// VERIFICATION EMAIL
 // ============================================================
 
 async function sendVerificationEmail(email, otp) {
 
-    await transporter.sendMail({
+    const textMessage = [
+        "Hello,",
+        "",
+        "Your TrueAegis email verification code is:",
+        "",
+        String(otp),
+        "",
+        "This code expires in 5 minutes.",
+        "",
+        "If you did not request this code, you can safely ignore this email.",
+        "",
+        "TrueAegis Security Team"
+    ].join("\n");
 
-        from:
-            `"TrueAegis Security" <${process.env.GMAIL_USER}>`,
+    const htmlMessage = [
+        "<!DOCTYPE html>",
+        "<html>",
+        "<head>",
+        '<meta charset="UTF-8">',
+        "<title>TrueAegis Verification</title>",
+        "</head>",
+        '<body style="margin:0;padding:30px;background:#06101a;font-family:Arial,Helvetica,sans-serif;color:#ffffff;">',
 
+        '<div style="max-width:600px;margin:auto;background:#091b29;border:1px solid #21435d;border-radius:16px;padding:35px;">',
+
+        '<h1 style="color:#16c7f2;">🛡️ TrueAegis</h1>',
+
+        "<h2>Email Verification</h2>",
+
+        "<p>Your verification code is:</p>",
+
+        '<div style="background:#102d43;border-radius:12px;padding:25px;text-align:center;font-size:36px;font-weight:bold;letter-spacing:10px;color:#ffffff;">',
+
+        String(otp),
+
+        "</div>",
+
+        '<p style="color:#9db0c5;">This code expires in <strong>5 minutes</strong>.</p>',
+
+        '<p style="color:#9db0c5;">If you did not request this code, you can safely ignore this email.</p>',
+
+        '<hr style="border:none;border-top:1px solid #24445a;margin:30px 0;">',
+
+        '<p style="color:#6f8ca3;font-size:13px;">TrueAegis Security Team</p>',
+
+        "</div>",
+        "</body>",
+        "</html>"
+    ].join("");
+
+    await sendEmail({
         to: email,
-
-        subject:
-            "TrueAegis - Email Verification Code",
-
-        text:
-`Hello,
-
-Your TrueAegis email verification code is:
-
-${otp}
-
-This code expires in 5 minutes.
-
-If you did not request this code, you can safely ignore this email.
-
-TrueAegis Security Team`,
-
-        html:
-`
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>TrueAegis Verification</title>
-</head>
-
-<body style="
-    margin:0;
-    padding:30px;
-    background:#06101a;
-    font-family:Arial,Helvetica,sans-serif;
-    color:#ffffff;
-">
-
-<div style="
-    max-width:600px;
-    margin:auto;
-    background:#091b29;
-    border:1px solid #21435d;
-    border-radius:16px;
-    padding:35px;
-">
-
-<h1 style="
-    color:#16c7f2;
-    margin-top:0;
-">
-🛡️ TrueAegis
-</h1>
-
-<h2>Email Verification</h2>
-
-<p>
-Your verification code is:
-</p>
-
-<div style="
-    background:#102d43;
-    border-radius:12px;
-    padding:25px;
-    text-align:center;
-    font-size:36px;
-    font-weight:bold;
-    letter-spacing:10px;
-    color:#ffffff;
-">
-${otp}
-</div>
-
-<p style="color:#9db0c5;">
-This code expires in
-<strong>5 minutes</strong>.
-</p>
-
-<p style="color:#9db0c5;">
-If you did not request this code,
-you can safely ignore this email.
-</p>
-
-<hr style="
-    border:none;
-    border-top:1px solid #24445a;
-    margin:30px 0;
-">
-
-<p style="
-    color:#6f8ca3;
-    font-size:13px;
-">
-TrueAegis Security Team
-</p>
-
-</div>
-
-</body>
-</html>
-`
+        subject: "TrueAegis - Email Verification Code",
+        text: textMessage,
+        html: htmlMessage
     });
 }
 
 // ============================================================
-// HELPER: SEND PASSWORD RESET EMAIL
+// PASSWORD RESET EMAIL
 // ============================================================
 
 async function sendPasswordResetEmail(email, token) {
 
+    const baseUrl = (
+        process.env.APP_URL ||
+        "http://localhost:3000"
+    ).replace(/\/+$/, "");
+
     const resetUrl =
-        `http://localhost:3000/?resetToken=${encodeURIComponent(token)}`;
+        `${baseUrl}/?resetToken=${encodeURIComponent(token)}`;
 
-    await transporter.sendMail({
+    const textMessage = [
+        "A password reset was requested for your TrueAegis account.",
+        "",
+        "Reset your password using this link:",
+        "",
+        resetUrl,
+        "",
+        "This reset link expires in 15 minutes.",
+        "",
+        "If you did not request this, you can safely ignore this email.",
+        "",
+        "TrueAegis Security Team"
+    ].join("\n");
 
-        from:
-            `"TrueAegis Security" <${process.env.GMAIL_USER}>`,
+    const htmlMessage = [
+        "<!DOCTYPE html>",
+        "<html>",
+        "<head>",
+        '<meta charset="UTF-8">',
+        "<title>TrueAegis Password Reset</title>",
+        "</head>",
 
+        '<body style="margin:0;padding:30px;background:#06101a;font-family:Arial,Helvetica,sans-serif;color:#ffffff;">',
+
+        '<div style="max-width:600px;margin:auto;background:#091b29;border:1px solid #21435d;border-radius:16px;padding:35px;">',
+
+        '<h1 style="color:#16c7f2;">🛡️ TrueAegis</h1>',
+
+        "<h2>Password Reset</h2>",
+
+        "<p>A password reset was requested for your TrueAegis account.</p>",
+
+        "<p>Click the button below to reset your password:</p>",
+
+        `<p><a href="${resetUrl}" style="display:inline-block;padding:12px 18px;background:#16c7f2;color:#001018;text-decoration:none;border-radius:8px;font-weight:bold;">Reset Password</a></p>`,
+
+        '<p style="color:#9db0c5;">This reset link expires in 15 minutes.</p>',
+
+        '<p style="color:#9db0c5;">If you did not request this, you can safely ignore this email.</p>',
+
+        "</div>",
+        "</body>",
+        "</html>"
+    ].join("");
+
+    await sendEmail({
         to: email,
-
-        subject:
-            "TrueAegis - Password Reset",
-
-        text:
-`A password reset was requested for your TrueAegis account.
-
-Reset your password using this token:
-
-${token}
-
-This reset token expires in 15 minutes.
-
-If you did not request this, you can ignore this email.`,
-
-        html:
-`
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>TrueAegis Password Reset</title>
-</head>
-
-<body style="
-    margin:0;
-    padding:30px;
-    background:#06101a;
-    font-family:Arial,Helvetica,sans-serif;
-    color:#ffffff;
-">
-
-<div style="
-    max-width:600px;
-    margin:auto;
-    background:#091b29;
-    border:1px solid #21435d;
-    border-radius:16px;
-    padding:35px;
-">
-
-<h1 style="color:#16c7f2;">
-🛡️ TrueAegis
-</h1>
-
-<h2>Password Reset</h2>
-
-<p>
-A password reset was requested for your account.
-</p>
-
-<p>
-Your reset token is:
-</p>
-
-<div style="
-    background:#102d43;
-    padding:20px;
-    border-radius:10px;
-    text-align:center;
-    word-break:break-all;
-    color:#16c7f2;
-">
-${token}
-</div>
-
-<p style="color:#9db0c5;">
-This token expires in 15 minutes.
-</p>
-
-<p style="color:#9db0c5;">
-You can use the reset link below:
-</p>
-
-<p>
-<a
-    href="${resetUrl}"
-    style="
-        display:inline-block;
-        padding:12px 18px;
-        background:#16c7f2;
-        color:#001018;
-        text-decoration:none;
-        border-radius:8px;
-        font-weight:bold;
-    "
->
-Reset Password
-</a>
-</p>
-
-</div>
-
-</body>
-</html>
-`
+        subject: "TrueAegis - Password Reset",
+        text: textMessage,
+        html: htmlMessage
     });
 }
 
 // ============================================================
-// HEALTH
+// HEALTH CHECK
 // GET /api/auth/health
 // ============================================================
 
@@ -294,9 +228,17 @@ router.get("/health", (req, res) => {
 
     res.json({
         success: true,
-        message: "TrueAegis authentication API is running."
-    });
+        message: "TrueAegis authentication API is running.",
 
+        googleAuthConfigured:
+            Boolean(process.env.GOOGLE_CLIENT_ID),
+
+        emailConfigured:
+            Boolean(
+                process.env.GMAIL_USER &&
+                process.env.GMAIL_APP_PASSWORD
+            )
+    });
 });
 
 // ============================================================
@@ -317,125 +259,90 @@ router.post("/register", async (req, res) => {
             language
         } = req.body || {};
 
-        // ----------------------------------------------------
-        // SUPPORT BOTH "name" AND "fullName"
-        // ----------------------------------------------------
-
         const finalFullName =
             String(fullName || name || "").trim();
 
         const normalizedEmail =
             normalizeEmail(email);
 
-        // ----------------------------------------------------
-        // VALIDATION
-        // ----------------------------------------------------
-
         if (!finalFullName) {
-
             return res.status(400).json({
                 success: false,
                 message: "Full name is required."
             });
-
         }
 
         if (finalFullName.length < 2) {
-
             return res.status(400).json({
                 success: false,
                 message: "Please enter a valid full name."
             });
-
         }
 
         if (!normalizedEmail) {
-
             return res.status(400).json({
                 success: false,
                 message: "Email is required."
             });
-
         }
 
-        if (!normalizedEmail.endsWith("@gmail.com")) {
-
+        if (
+            !/^[^\s@]+@gmail\.com$/i.test(
+                normalizedEmail
+            )
+        ) {
             return res.status(400).json({
                 success: false,
                 message: "Please use a valid Gmail address."
             });
-
         }
 
         if (!password) {
-
             return res.status(400).json({
                 success: false,
                 message: "Password is required."
             });
-
         }
 
         if (String(password).length < 8) {
-
             return res.status(400).json({
                 success: false,
                 message:
                     "Password must be at least 8 characters."
             });
-
         }
 
-        const finalAge =
-            Number(age);
+        const finalAge = Number(age);
 
         if (
             !Number.isFinite(finalAge) ||
             finalAge < 13
         ) {
-
             return res.status(400).json({
                 success: false,
                 message:
                     "You must be at least 13 years old."
             });
-
         }
 
         const finalLanguage =
             String(language || "English").trim();
 
-        // ----------------------------------------------------
-        // FIND EXISTING USER
-        // ----------------------------------------------------
+        let user = await User.findOne({
+            email: normalizedEmail
+        });
 
-        let user =
-            await User.findOne({
-                email: normalizedEmail
-            });
-
-        // ----------------------------------------------------
-        // EXISTING VERIFIED USER
-        // ----------------------------------------------------
-
-        if (user && user.verified === true) {
-
+        if (
+            user &&
+            user.verified === true
+        ) {
             return res.status(409).json({
-
                 success: false,
-
                 code: "ACCOUNT_EXISTS",
-
                 message:
                     "An account with this email already exists. Please log in."
-
             });
-
         }
-
-        // ----------------------------------------------------
-        // HASH PASSWORD
-        // ----------------------------------------------------
 
         const hashedPassword =
             await bcrypt.hash(
@@ -443,21 +350,12 @@ router.post("/register", async (req, res) => {
                 12
             );
 
-        // ----------------------------------------------------
-        // GENERATE OTP
-        // ----------------------------------------------------
-
-        const otp =
-            generateOTP();
+        const otp = generateOTP();
 
         const otpExpires =
             new Date(
                 Date.now() + OTP_EXPIRY_MS
             );
-
-        // ----------------------------------------------------
-        // UPDATE EXISTING UNVERIFIED USER
-        // ----------------------------------------------------
 
         if (user) {
 
@@ -476,6 +374,9 @@ router.post("/register", async (req, res) => {
             user.verified =
                 false;
 
+            user.authProvider =
+                "local";
+
             user.otp =
                 otp;
 
@@ -488,54 +389,45 @@ router.post("/register", async (req, res) => {
                 `♻️ Updated unverified account: ${normalizedEmail}`
             );
 
-        }
+        } else {
 
-        // ----------------------------------------------------
-        // CREATE NEW USER
-        // ----------------------------------------------------
+            user = new User({
 
-        else {
+                fullName:
+                    finalFullName,
 
-            user =
-                new User({
+                email:
+                    normalizedEmail,
 
-                    fullName:
-                        finalFullName,
+                password:
+                    hashedPassword,
 
-                    email:
-                        normalizedEmail,
+                age:
+                    finalAge,
 
-                    password:
-                        hashedPassword,
+                language:
+                    finalLanguage,
 
-                    age:
-                        finalAge,
+                verified:
+                    false,
 
-                    language:
-                        finalLanguage,
+                authProvider:
+                    "local",
 
-                    verified:
-                        false,
+                otp:
+                    otp,
 
-                    otp:
-                        otp,
+                otpExpires:
+                    otpExpires
 
-                    otpExpires:
-                        otpExpires
-
-                });
+            });
 
             await user.save();
 
             console.log(
                 `✅ New account created: ${normalizedEmail}`
             );
-
         }
-
-        // ----------------------------------------------------
-        // SEND OTP
-        // ----------------------------------------------------
 
         await sendVerificationEmail(
             normalizedEmail,
@@ -558,9 +450,7 @@ router.post("/register", async (req, res) => {
 
         });
 
-    }
-
-    catch (error) {
+    } catch (error) {
 
         console.error(
             "❌ REGISTER ERROR:",
@@ -571,31 +461,20 @@ router.post("/register", async (req, res) => {
             error &&
             error.code === 11000
         ) {
-
             return res.status(409).json({
-
                 success: false,
-
                 code: "ACCOUNT_EXISTS",
-
                 message:
                     "An account with this email already exists. Please log in."
-
             });
-
         }
 
         return res.status(500).json({
-
             success: false,
-
             message:
                 "Registration failed. Please try again."
-
         });
-
     }
-
 });
 
 // ============================================================
@@ -618,39 +497,20 @@ router.post("/verify-otp", async (req, res) => {
         const enteredOTP =
             String(otp || "").trim();
 
-        // ----------------------------------------------------
-        // VALIDATION
-        // ----------------------------------------------------
-
         if (!normalizedEmail) {
-
             return res.status(400).json({
-
                 success: false,
-
-                message:
-                    "Email is required."
-
+                message: "Email is required."
             });
-
         }
 
         if (!/^\d{6}$/.test(enteredOTP)) {
-
             return res.status(400).json({
-
                 success: false,
-
                 message:
                     "Please enter the 6-digit verification code."
-
             });
-
         }
-
-        // ----------------------------------------------------
-        // FIND USER
-        // ----------------------------------------------------
 
         const user =
             await User.findOne({
@@ -658,69 +518,36 @@ router.post("/verify-otp", async (req, res) => {
             });
 
         if (!user) {
-
             return res.status(404).json({
-
                 success: false,
-
                 message:
                     "No account was found for this email."
-
             });
-
         }
-
-        // ----------------------------------------------------
-        // ALREADY VERIFIED
-        // ----------------------------------------------------
 
         if (user.verified === true) {
-
             return res.status(200).json({
-
                 success: true,
-
                 message:
                     "Your email is already verified.",
-
                 verified: true,
-
-                user: {
-                    id: user._id,
-                    fullName: user.fullName,
-                    email: user.email,
-                    age: user.age,
-                    language: user.language
-                }
-
+                user:
+                    publicUser(user)
             });
-
         }
-
-        // ----------------------------------------------------
-        // CHECK OTP
-        // ----------------------------------------------------
 
         if (!user.otp) {
-
             return res.status(400).json({
-
                 success: false,
-
                 message:
                     "No verification code found. Please request a new one."
-
             });
-
         }
-
-        // ----------------------------------------------------
-        // CHECK OTP EXPIRY
-        // ----------------------------------------------------
 
         if (
             !user.otpExpires ||
-            Date.now() > new Date(user.otpExpires).getTime()
+            Date.now() >
+            new Date(user.otpExpires).getTime()
         ) {
 
             user.otp = null;
@@ -729,58 +556,25 @@ router.post("/verify-otp", async (req, res) => {
             await user.save();
 
             return res.status(400).json({
-
                 success: false,
-
                 message:
                     "Verification code has expired. Please request a new one."
-
             });
-
         }
-
-        // ----------------------------------------------------
-        // COMPARE OTP
-        // ----------------------------------------------------
 
         if (
             enteredOTP !==
             String(user.otp)
         ) {
-
-            console.log(
-                `❌ Incorrect OTP for ${normalizedEmail}`
-            );
-
             return res.status(400).json({
-
                 success: false,
-
                 message:
                     "Incorrect verification code."
-
             });
-
         }
 
-        // ----------------------------------------------------
-        // *** THIS IS THE IMPORTANT PART ***
-        // ----------------------------------------------------
-        //
-        // Your User model uses:
-        //
-        // verified
-        //
-        // NOT:
-        //
-        // isVerified
-        //
-        // ----------------------------------------------------
-
         user.verified = true;
-
         user.otp = null;
-
         user.otpExpires = null;
 
         await user.save();
@@ -789,10 +583,6 @@ router.post("/verify-otp", async (req, res) => {
             `✅ Email verified permanently: ${normalizedEmail}`
         );
 
-        // ----------------------------------------------------
-        // RETURN USER
-        // ----------------------------------------------------
-
         return res.status(200).json({
 
             success: true,
@@ -800,35 +590,15 @@ router.post("/verify-otp", async (req, res) => {
             message:
                 "Email verified successfully. You can now log in.",
 
-            verified: true,
+            verified:
+                true,
 
-            user: {
-
-                id:
-                    user._id,
-
-                fullName:
-                    user.fullName,
-
-                email:
-                    user.email,
-
-                age:
-                    user.age,
-
-                language:
-                    user.language,
-
-                verified:
-                    user.verified
-
-            }
+            user:
+                publicUser(user)
 
         });
 
-    }
-
-    catch (error) {
+    } catch (error) {
 
         console.error(
             "❌ OTP VERIFY ERROR:",
@@ -836,16 +606,11 @@ router.post("/verify-otp", async (req, res) => {
         );
 
         return res.status(500).json({
-
             success: false,
-
             message:
                 "Email verification failed."
-
         });
-
     }
-
 });
 
 // ============================================================
@@ -865,16 +630,11 @@ router.post("/resend-otp", async (req, res) => {
             normalizeEmail(email);
 
         if (!normalizedEmail) {
-
             return res.status(400).json({
-
                 success: false,
-
                 message:
                     "Email is required."
-
             });
-
         }
 
         const user =
@@ -883,36 +643,24 @@ router.post("/resend-otp", async (req, res) => {
             });
 
         if (!user) {
-
             return res.status(404).json({
-
                 success: false,
-
                 message:
                     "No account was found for this email."
-
             });
-
         }
 
         if (user.verified === true) {
-
             return res.status(400).json({
-
                 success: false,
-
                 message:
                     "This email is already verified. Please log in."
-
             });
-
         }
 
-        const otp =
-            generateOTP();
+        const otp = generateOTP();
 
-        user.otp =
-            otp;
+        user.otp = otp;
 
         user.otpExpires =
             new Date(
@@ -926,22 +674,13 @@ router.post("/resend-otp", async (req, res) => {
             otp
         );
 
-        console.log(
-            `✅ New OTP sent to ${normalizedEmail}`
-        );
-
         return res.status(200).json({
-
             success: true,
-
             message:
                 "A new verification code has been sent."
-
         });
 
-    }
-
-    catch (error) {
+    } catch (error) {
 
         console.error(
             "❌ RESEND OTP ERROR:",
@@ -949,16 +688,11 @@ router.post("/resend-otp", async (req, res) => {
         );
 
         return res.status(500).json({
-
             success: false,
-
             message:
                 "Could not resend the verification code."
-
         });
-
     }
-
 });
 
 // ============================================================
@@ -978,26 +712,16 @@ router.post("/login", async (req, res) => {
         const normalizedEmail =
             normalizeEmail(email);
 
-        // ----------------------------------------------------
-        // VALIDATION
-        // ----------------------------------------------------
-
-        if (!normalizedEmail || !password) {
-
+        if (
+            !normalizedEmail ||
+            !password
+        ) {
             return res.status(400).json({
-
                 success: false,
-
                 message:
                     "Email and password are required."
-
             });
-
         }
-
-        // ----------------------------------------------------
-        // FIND USER
-        // ----------------------------------------------------
 
         const user =
             await User.findOne({
@@ -1005,21 +729,22 @@ router.post("/login", async (req, res) => {
             });
 
         if (!user) {
-
             return res.status(401).json({
-
                 success: false,
-
                 message:
                     "Invalid email or password."
-
             });
-
         }
 
-        // ----------------------------------------------------
-        // CHECK PASSWORD
-        // ----------------------------------------------------
+        if (!user.password) {
+            return res.status(401).json({
+                success: false,
+                code:
+                    "GOOGLE_ACCOUNT",
+                message:
+                    "This account uses Google Sign-In. Please continue with Google."
+            });
+        }
 
         const passwordMatches =
             await bcrypt.compare(
@@ -1028,46 +753,22 @@ router.post("/login", async (req, res) => {
             );
 
         if (!passwordMatches) {
-
             return res.status(401).json({
-
                 success: false,
-
                 message:
                     "Invalid email or password."
-
             });
-
         }
-
-        // ----------------------------------------------------
-        // CHECK VERIFIED STATUS
-        // ----------------------------------------------------
-        //
-        // IMPORTANT:
-        // Your User model uses "verified".
-        //
-        // ----------------------------------------------------
 
         if (user.verified !== true) {
-
             return res.status(403).json({
-
                 success: false,
-
                 code:
                     "EMAIL_NOT_VERIFIED",
-
                 message:
                     "Please verify your email before logging in."
-
             });
-
         }
-
-        // ----------------------------------------------------
-        // LOGIN SUCCESS
-        // ----------------------------------------------------
 
         console.log(
             `✅ Login successful: ${normalizedEmail}`
@@ -1080,33 +781,12 @@ router.post("/login", async (req, res) => {
             message:
                 "Login successful.",
 
-            user: {
-
-                id:
-                    user._id,
-
-                fullName:
-                    user.fullName,
-
-                email:
-                    user.email,
-
-                age:
-                    user.age,
-
-                language:
-                    user.language,
-
-                verified:
-                    user.verified
-
-            }
+            user:
+                publicUser(user)
 
         });
 
-    }
-
-    catch (error) {
+    } catch (error) {
 
         console.error(
             "❌ LOGIN ERROR:",
@@ -1114,16 +794,219 @@ router.post("/login", async (req, res) => {
         );
 
         return res.status(500).json({
-
             success: false,
-
             message:
                 "Login failed. Please try again."
+        });
+    }
+});
+
+// ============================================================
+// GOOGLE LOGIN
+// POST /api/auth/google
+// ============================================================
+
+router.post("/google", async (req, res) => {
+
+    try {
+
+        const {
+            credential
+        } = req.body || {};
+
+        if (!credential) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Google authentication credential is required."
+            });
+        }
+
+        if (!process.env.GOOGLE_CLIENT_ID) {
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Google authentication is not configured on the server."
+            });
+        }
+
+        const ticket =
+            await googleClient.verifyIdToken({
+
+                idToken:
+                    credential,
+
+                audience:
+                    process.env.GOOGLE_CLIENT_ID
+
+            });
+
+        const payload =
+            ticket.getPayload();
+
+        if (!payload) {
+            return res.status(401).json({
+                success: false,
+                message:
+                    "Invalid Google authentication."
+            });
+        }
+
+        const googleId =
+            payload.sub;
+
+        const googleEmail =
+            normalizeEmail(payload.email);
+
+        const googleName =
+            String(
+                payload.name ||
+                "TrueAegis User"
+            ).trim();
+
+        const emailVerified =
+            payload.email_verified === true;
+
+        if (
+            !googleId ||
+            !googleEmail
+        ) {
+            return res.status(401).json({
+                success: false,
+                message:
+                    "Google account information is incomplete."
+            });
+        }
+
+        if (!emailVerified) {
+            return res.status(403).json({
+                success: false,
+                message:
+                    "Your Google email has not been verified."
+            });
+        }
+
+        let user =
+            await User.findOne({
+                googleId:
+                    googleId
+            });
+
+        if (!user) {
+            user =
+                await User.findOne({
+                    email:
+                        googleEmail
+                });
+        }
+
+        if (!user) {
+
+            user = new User({
+
+                fullName:
+                    googleName,
+
+                email:
+                    googleEmail,
+
+                password:
+                    null,
+
+                googleId:
+                    googleId,
+
+                authProvider:
+                    "google",
+
+                verified:
+                    true,
+
+                age:
+                    null,
+
+                language:
+                    "English"
+
+            });
+
+            await user.save();
+
+            console.log(
+                `✅ New Google account created: ${googleEmail}`
+            );
+
+        } else {
+
+            if (
+                user.googleId &&
+                user.googleId !== googleId
+            ) {
+
+                return res.status(409).json({
+
+                    success: false,
+
+                    code:
+                        "GOOGLE_ACCOUNT_CONFLICT",
+
+                    message:
+                        "This Google account cannot be linked to the existing account."
+
+                });
+            }
+
+            if (!user.googleId) {
+
+                user.googleId =
+                    googleId;
+
+                if (!user.password) {
+                    user.authProvider =
+                        "google";
+                }
+            }
+
+            user.verified =
+                true;
+
+            if (!user.fullName) {
+                user.fullName =
+                    googleName;
+            }
+
+            await user.save();
+        }
+
+        console.log(
+            `✅ Google login successful: ${googleEmail}`
+        );
+
+        return res.status(200).json({
+
+            success: true,
+
+            message:
+                "Google login successful.",
+
+            user:
+                publicUser(user)
 
         });
 
-    }
+    } catch (error) {
 
+        console.error(
+            "❌ GOOGLE LOGIN ERROR:",
+            error
+        );
+
+        return res.status(401).json({
+            success: false,
+            message:
+                "Google authentication failed. Please try again."
+        });
+    }
 });
 
 // ============================================================
@@ -1143,35 +1026,25 @@ router.post("/check-email", async (req, res) => {
             normalizeEmail(email);
 
         if (!normalizedEmail) {
-
             return res.status(400).json({
-
                 success: false,
-
                 message:
                     "Email is required."
-
             });
-
         }
 
         const user =
             await User.findOne({
-                email: normalizedEmail
+                email:
+                    normalizedEmail
             });
 
         if (!user) {
-
             return res.json({
-
                 success: true,
-
                 exists: false,
-
                 verified: false
-
             });
-
         }
 
         return res.json({
@@ -1181,13 +1054,15 @@ router.post("/check-email", async (req, res) => {
             exists: true,
 
             verified:
-                user.verified === true
+                user.verified === true,
+
+            authProvider:
+                user.authProvider ||
+                "local"
 
         });
 
-    }
-
-    catch (error) {
+    } catch (error) {
 
         console.error(
             "❌ CHECK EMAIL ERROR:",
@@ -1195,16 +1070,11 @@ router.post("/check-email", async (req, res) => {
         );
 
         return res.status(500).json({
-
             success: false,
-
             message:
                 "Could not check the email."
-
         });
-
     }
-
 });
 
 // ============================================================
@@ -1224,46 +1094,49 @@ router.post("/forgot-password", async (req, res) => {
             normalizeEmail(email);
 
         if (!normalizedEmail) {
-
             return res.status(400).json({
-
                 success: false,
-
                 message:
                     "Email is required."
-
             });
-
         }
 
         const user =
             await User.findOne({
-                email: normalizedEmail
+                email:
+                    normalizedEmail
             });
 
-        /*
-         * Don't reveal whether the account exists.
-         */
-
         if (!user) {
+            return res.status(200).json({
+                success: true,
+                message:
+                    "If an account exists for that email, a password reset email has been sent."
+            });
+        }
+
+        if (
+            user.authProvider === "google" &&
+            !user.password
+        ) {
 
             return res.status(200).json({
 
                 success: true,
 
+                code:
+                    "GOOGLE_ACCOUNT",
+
                 message:
-                    "If an account exists for that email, a password reset email has been sent."
+                    "This account uses Google Sign-In. Please sign in with Google."
 
             });
-
         }
 
-        // ----------------------------------------------------
-        // GENERATE RESET TOKEN
-        // ----------------------------------------------------
-
         const resetToken =
-            crypto.randomBytes(32).toString("hex");
+            crypto
+                .randomBytes(32)
+                .toString("hex");
 
         user.resetPasswordToken =
             crypto
@@ -1273,14 +1146,11 @@ router.post("/forgot-password", async (req, res) => {
 
         user.resetPasswordExpires =
             new Date(
-                Date.now() + RESET_EXPIRY_MS
+                Date.now() +
+                RESET_EXPIRY_MS
             );
 
         await user.save();
-
-        // ----------------------------------------------------
-        // SEND RESET EMAIL
-        // ----------------------------------------------------
 
         await sendPasswordResetEmail(
             normalizedEmail,
@@ -1296,9 +1166,7 @@ router.post("/forgot-password", async (req, res) => {
 
         });
 
-    }
-
-    catch (error) {
+    } catch (error) {
 
         console.error(
             "❌ FORGOT PASSWORD ERROR:",
@@ -1306,16 +1174,11 @@ router.post("/forgot-password", async (req, res) => {
         );
 
         return res.status(500).json({
-
             success: false,
-
             message:
                 "Could not process the password reset request."
-
         });
-
     }
-
 });
 
 // ============================================================
@@ -1333,29 +1196,19 @@ router.post("/reset-password", async (req, res) => {
         } = req.body || {};
 
         if (!token || !password) {
-
             return res.status(400).json({
-
                 success: false,
-
                 message:
                     "Reset token and new password are required."
-
             });
-
         }
 
         if (String(password).length < 8) {
-
             return res.status(400).json({
-
                 success: false,
-
                 message:
                     "Password must be at least 8 characters."
-
             });
-
         }
 
         const hashedToken =
@@ -1371,27 +1224,19 @@ router.post("/reset-password", async (req, res) => {
                     hashedToken,
 
                 resetPasswordExpires: {
-                    $gt: new Date()
+                    $gt:
+                        new Date()
                 }
 
             });
 
         if (!user) {
-
             return res.status(400).json({
-
                 success: false,
-
                 message:
                     "The password reset token is invalid or has expired."
-
             });
-
         }
-
-        // ----------------------------------------------------
-        // UPDATE PASSWORD
-        // ----------------------------------------------------
 
         user.password =
             await bcrypt.hash(
@@ -1404,6 +1249,12 @@ router.post("/reset-password", async (req, res) => {
 
         user.resetPasswordExpires =
             null;
+
+        user.authProvider =
+            "local";
+
+        user.verified =
+            true;
 
         await user.save();
 
@@ -1420,9 +1271,7 @@ router.post("/reset-password", async (req, res) => {
 
         });
 
-    }
-
-    catch (error) {
+    } catch (error) {
 
         console.error(
             "❌ RESET PASSWORD ERROR:",
@@ -1430,26 +1279,16 @@ router.post("/reset-password", async (req, res) => {
         );
 
         return res.status(500).json({
-
             success: false,
-
             message:
                 "Could not reset the password."
-
         });
-
     }
-
 });
 
 // ============================================================
 // LOGOUT
 // POST /api/auth/logout
-// ============================================================
-//
-// There is no server-side session to destroy yet.
-// The current frontend can clear its local login state.
-//
 // ============================================================
 
 router.post("/logout", (req, res) => {
@@ -1462,11 +1301,10 @@ router.post("/logout", (req, res) => {
             "Logged out successfully."
 
     });
-
 });
 
 // ============================================================
-// EXPORT ROUTER
+// EXPORT
 // ============================================================
 
 module.exports = router;

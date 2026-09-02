@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://trueaegis.onrender.com/sitemap.xml

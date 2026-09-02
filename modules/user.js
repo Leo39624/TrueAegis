@@ -1,85 +1,33 @@
 const mongoose = require("mongoose");
 
-// =====================================================
-// USER SCHEMA
-// =====================================================
+// ============================================================
+// TRUEAEGIS USER SCHEMA
+// ============================================================
 
 const userSchema = new mongoose.Schema(
     {
-        // -------------------------
-        // User's full name
-        // -------------------------
+        // ----------------------------------------------------
+        // BASIC INFORMATION
+        // ----------------------------------------------------
 
         fullName: {
             type: String,
             required: true,
-            trim: true,
-            minlength: 2,
-            maxlength: 100
+            trim: true
         },
-
-        // -------------------------
-        // Email address
-        // -------------------------
 
         email: {
             type: String,
             required: true,
             unique: true,
             lowercase: true,
-            trim: true,
-            index: true
+            trim: true
         },
-
-        // -------------------------
-        // Hashed password
-        // -------------------------
-
-        password: {
-            type: String,
-            required: true
-        },
-
-        // -------------------------
-        // Email verification
-        // -------------------------
-
-        verified: {
-            type: Boolean,
-            default: false
-        },
-
-        // -------------------------
-        // Password reset token
-        // -------------------------
-
-        resetPasswordToken: {
-            type: String,
-            default: null
-        },
-
-        // -------------------------
-        // Password reset expiry
-        // -------------------------
-
-        resetPasswordExpires: {
-            type: Date,
-            default: null
-        },
-
-        // -------------------------
-        // Optional age
-        // -------------------------
 
         age: {
             type: Number,
-            default: null,
-            min: 13
+            default: null
         },
-
-        // -------------------------
-        // Preferred language
-        // -------------------------
 
         language: {
             type: String,
@@ -87,37 +35,77 @@ const userSchema = new mongoose.Schema(
             trim: true
         },
 
-        // -------------------------
-        // OTP for email verification
-        // -------------------------
+        // ----------------------------------------------------
+        // LOCAL AUTHENTICATION
+        // ----------------------------------------------------
+
+        password: {
+            type: String,
+            default: null
+        },
+
+        // ----------------------------------------------------
+        // ACCOUNT VERIFICATION
+        // ----------------------------------------------------
+
+        verified: {
+            type: Boolean,
+            default: false
+        },
+
+        authProvider: {
+            type: String,
+            enum: ["local", "google"],
+            default: "local"
+        },
+
+        // ----------------------------------------------------
+        // OTP VERIFICATION
+        // ----------------------------------------------------
 
         otp: {
             type: String,
             default: null
         },
 
-        // -------------------------
-        // OTP expiry
-        // -------------------------
-
         otpExpires: {
+            type: Date,
+            default: null
+        },
+
+        // ----------------------------------------------------
+        // GOOGLE SIGN-IN
+        // ----------------------------------------------------
+
+        googleId: {
+            type: String,
+            default: null,
+            sparse: true
+        },
+
+        // ----------------------------------------------------
+        // PASSWORD RESET
+        // ----------------------------------------------------
+
+        resetPasswordToken: {
+            type: String,
+            default: null
+        },
+
+        resetPasswordExpires: {
             type: Date,
             default: null
         }
     },
-
     {
         timestamps: true
     }
 );
 
-// =====================================================
+// ============================================================
 // EXPORT MODEL
-// =====================================================
+// ============================================================
 
-const User = mongoose.model(
-    "User",
-    userSchema
-);
-
-module.exports = User;
+module.exports =
+    mongoose.models.User ||
+    mongoose.model("User", userSchema);

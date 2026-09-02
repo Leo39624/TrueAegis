@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>TrueAegis · Living Dragon</title>
+  <style>
+    :root {
+      --panel: rgba(3, 14, 24, 0.82);
+      --border: rgba(0, 217, 255, 0.28);
+      --text: #eef8ff;
+      --muted: #8eabc0;
+      --accent: #00d9ff;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      width: 100%; height: 100%; margin: 0; overflow: hidden;
+      background: #030a11;
+    }
+
+    body {
+      cursor: none;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw; height: 100vh;
+      touch-action: none;
+    }
+
+    .hud {
+      position: fixed; top: 18px; left: 18px; z-index: 5;
+      width: min(360px, calc(100vw - 36px));
+      padding: 16px 18px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      color: var(--text);
+      background: var(--panel);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35), 0 0 40px rgba(0, 217, 255, 0.06);
+      backdrop-filter: blur(16px);
+      user-select: none;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+    }
+
+    .hud.hidden {
+      opacity: 0; transform: translateY(-12px); pointer-events: none;
+    }
+
+    .hud h1 {
+      margin: 0 0 6px;
+      font-size: 16px; font-weight: 800; letter-spacing: 0.03em;
+    }
+
+    .hud h1 span { color: var(--accent); }
+
+    .hud p {
+      margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.55;
+    }
+
+    .keys {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px;
+    }
+
+    .key {
+      padding: 4px 8px;
+      border: 1px solid rgba(0, 217, 255, 0.2);
+      border-radius: 6px;
+      color: #b8f0ff;
+      background: rgba(0, 217, 255, 0.07);
+      font-size: 11px; font-weight: 700; letter-spacing: 0.03em;
+    }
+
+    .hint {
+      position: fixed; right: 18px; bottom: 16px; z-index: 5;
+      color: rgba(180, 220, 240, 0.5);
+      font-size: 12px; letter-spacing: 0.04em;
+      pointer-events: none; user-select: none;
+    }
+
+    .cursor {
+      position: fixed; top: 0; left: 0; z-index: 10;
+      width: 14px; height: 14px;
+      border: 1.5px solid rgba(0, 217, 255, 0.95);
+      border-radius: 50%;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 12px rgba(0, 217, 255, 0.7), 0 0 28px rgba(0, 180, 255, 0.25);
+      transition: width 0.14s ease, height 0.14s ease, border-color 0.14s ease;
+    }
+
+    .cursor.active {
+      width: 28px; height: 28px;
+      border-color: rgba(255, 140, 40, 0.95);
+      box-shadow: 0 0 14px rgba(255, 120, 20, 0.9), 0 0 32px rgba(255, 60, 0, 0.45);
+    }
+
+    .mobile-controls {
+      position: fixed; left: 50%; bottom: 20px; z-index: 8;
+      display: none; gap: 8px; transform: translateX(-50%);
+    }
+
+    .mobile-controls button {
+      border: 1px solid rgba(0, 217, 255, 0.28);
+      border-radius: 999px;
+      padding: 10px 14px;
+      color: var(--text);
+      background: rgba(4, 16, 28, 0.8);
+      font: inherit; font-size: 13px; font-weight: 700;
+      backdrop-filter: blur(10px);
+    }
+
+    .mobile-controls button:active { transform: scale(0.96); }
+
+    @media (hover: none), (pointer: coarse) {
+      body { cursor: default; }
+      .cursor { display: none; }
+      .mobile-controls { display: flex; }
+      .hint { display: none; }
+      .hud { top: 12px; left: 12px; width: min(340px, calc(100vw - 24px)); }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <div class="hud" id="hud">
+    <h1>TrueAegis <span>Dragon Lab</span></h1>
+    <p>Move to guide the dragon. Click or tap to breathe fire.</p>
+    <div class="keys">
+      <span class="key">Click / Tap · Fire</span>
+      <span class="key">F · Fire</span>
+      <span class="key">C · Color</span>
+      <span class="key">R · Reset</span>
+      <span class="key">Space · Pause</span>
+      <span class="key">H · Help</span>
+    </div>
+  </div>
+
+  <div class="hint">Move to fly · Click to breathe fire</div>
+  <div class="cursor" id="cursor"></div>
+
+  <div class="mobile-controls">
+    <button type="button" id="btnFire">🔥 Fire</button>
+    <button type="button" id="btnColor">🎨 Color</button>
+    <button type="button" id="btnHelp">? Help</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("c");
+    const ctx = canvas.getContext("2d");
+    const cursorEl = document.getElementById("cursor");
+    const hud = document.getElementById("hud");
+
+    let W = 0, H = 0, dpr = 1;
+    let last = performance.now();
+    let time = 0, wingT = 0, fireEnergy = 0;
+    let paused = false, helpOn = true;
+
+    const mouse = { x: 0, y: 0, px: 0, py: 0, speed: 0 };
+
+    const palettes = [
+      {
+        name: "Cyan",
+        body: "#0d4a52", bodyLight: "#1a9a9e", belly: "#8fd4c8", bellyDark: "#3d7a72",
+        wing: "#156b6e", wingVein: "#9ee8e0", outline: "#c8fff8",
+        horn: "#e4d6b0", claw: "#f0e6c8", eye: "#7ffff0",
+        glow: "rgba(0, 217, 255, 0.55)",
+        fire: ["#e8ffff", "#7ef0ff", "#00d9ff", "#2080ff", "#1040aa"]
+      },
+      {
+        name: "Crimson",
+        body: "#6e1c2e", bodyLight: "#c44a50", belly: "#e8b48a", bellyDark: "#8a4e4c",
+        wing: "#7a2840", wingVein: "#ffc4c0", outline: "#ffe8d8",
+        horn: "#ead6ae", claw: "#ffe8d0", eye: "#ffe878",
+        glow: "rgba(255, 80, 90, 0.55)",
+        fire: ["#fff7bb", "#ffd234", "#ff751c", "#ed2f10", "#9d050e"]
+      },
+      {
+        name: "Sapphire",
+        body: "#1a3f78", bodyLight: "#3a88c8", belly: "#a8d4de", bellyDark: "#4e7a8a",
+        wing: "#245898", wingVein: "#b8f0ff", outline: "#d8f8ff",
+        horn: "#e0d1b2", claw: "#f0f5e6", eye: "#aaffff",
+        glow: "rgba(80, 190, 255, 0.55)",
+        fire: ["#f6ffff", "#96f7ff", "#4a9cff", "#5d55ff", "#9a2aff"]
+      },
+      {
+        name: "Obsidian",
+        body: "#2c2a3c", bodyLight: "#5a5a7a", belly: "#a8a4b4", bellyDark: "#585468",
+        wing: "#3c3a52", wingVein: "#d0ccff", outline: "#f0ecff",
+        horn: "#ddd2bc", claw: "#f3ecdf", eye: "#d08cff",
+        glow: "rgba(180, 120, 255, 0.55)",
+        fire: ["#fff1c0", "#fbb43a", "#ed5d1f", "#c12032", "#7b0c3e"]
+      }
+    ];
+
+    let palIdx = 0;
+    let colors = palettes[palIdx];
+
+    const SEG_N = 42;
+    const SEG_SP = 15;
+    const segments = [];
+    const particles = [];
+    const stars = [];
+    const sparks = [];
+
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const mix = (a, b, t) => a + (b - a) * t;
+    const hypot = Math.hypot;
+
+    function dir(a, b) {
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = hypot(dx, dy) || 1;
+      return { x: dx / len, y: dy / len, angle: Math.atan2(dy, dx) };
+    }
+
+    function normal(v) {
+      return { x: -v.y, y: v.x };
+    }
+
+    function pt(x, y) { return { x, y }; }
+
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = innerWidth; H = innerHeight;
+      canvas.width = Math.floor(W * dpr);
+      canvas.height = Math.floor(H * dpr);
+      canvas.style.width = W + "px";
+      canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      makeStars();
+      if (!segments.length) resetDragon();
+    }
+
+    function makeStars() {
+      stars.length = 0;
+      const n = Math.round((W * H) / 13000);
+      for (let i = 0; i < n; i++) {
+        stars.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          size: Math.random() * 1.3 + 0.2,
+          alpha: Math.random() * 0.55 + 0.12,
+          speed: Math.random() * 0.0014 + 0.0003,
+          phase: Math.random() * Math.PI * 2
+        });
+      }
+    }
+
+    function resetDragon() {
+      mouse.x = W * 0.58; mouse.y = H * 0.5;
+      mouse.px = mouse.x; mouse.py = mouse.y; mouse.speed = 0;
+      segments.length = 0;
+      for (let i = 0; i < SEG_N; i++) {
+        segments.push({
+          x: mouse.x - i * SEG_SP,
+          y: mouse.y + Math.sin(i * 0.24) * 5,
+          vx: 0, vy: 0
+        });
+      }
+    }
+
+    function setPointer(x, y) {
+      mouse.x = x; mouse.y = y;
+    }
+
+    function update(dt) {
+      const move = hypot(mouse.x - mouse.px, mouse.y - mouse.py);
+      mouse.speed += (move / Math.max(dt, 1) - mouse.speed) * 0.13;
+      mouse.px = mouse.x; mouse.py = mouse.y;
+
+      const head = segments[0];
+      head.vx += (mouse.x - head.x) * 0.1;
+      head.vy += (mouse.y - head.y) * 0.1;
+      head.vx *= 0.69; head.vy *= 0.69;
+      head.x += head.vx * dt * 0.054;
+      head.y += head.vy * dt * 0.054;
+
+      for (let i = 1; i < segments.length; i++) {
+        const prev = segments[i - 1];
+        const cur = segments[i];
+        const dx = prev.x - cur.x, dy = prev.y - cur.y;
+        const len = hypot(dx, dy) || 1;
+        const corr = (len - SEG_SP) / len;
+        cur.x += dx * corr * 0.86;
+        cur.y += dy * corr * 0.86;
+
+        const wave = Math.sin(time * 0.003 + i * 0.52) * (0.25 + Math.min(mouse.speed, 1.6) * 0.26);
+        cur.x += (-dy / len) * wave;
+        cur.y += (dx / len) * wave;
+      }
+
+      wingT += dt * (0.0055 + Math.min(mouse.speed, 1.3) * 0.0038);
+      fireEnergy = Math.max(0, fireEnergy - dt * 0.00115);
+      time += dt;
+    }
+
+    function bodyR(i) {
+      const p = i / (SEG_N - 1);
+      if (p < 0.18) return mix(31, 39, p / 0.18);
+      if (p < 0.58) return mix(39, 25, (p - 0.18) / 0.4);
+      return mix(25, 2, (p - 0.58) / 0.42);
+    }
+
+    function path(pts, close) {
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      if (close) ctx.closePath();
+    }
+
+    function fillPath(pts, style) {
+      path(pts, true);
+      ctx.fillStyle = style;
+      ctx.fill();
+    }
+
+    function strokePath(pts, color, w, a) {
+      path(pts, true);
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = a;
+      ctx.lineWidth = w;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    function bodyOutline() {
+      const left = [], right = [];
+      for (let i = 1; i < segments.length - 1; i++) {
+        const f = dir(segments[i - 1], segments[i + 1]);
+        const s = normal(f);
+        const r = bodyR(i);
+        left.push(pt(segments[i].x + s.x * r, segments[i].y + s.y * r));
+        right.push(pt(segments[i].x - s.x * r, segments[i].y - s.y * r));
+      }
+      return left.concat(right.reverse());
+    }
+
+    function drawBg() {
+      ctx.clearRect(0, 0, W, H);
+      const sky = ctx.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, "#07111d");
+      sky.addColorStop(0.45, "#0b1722");
+      sky.addColorStop(1, "#03060c");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, W, H);
+
+      const glow = ctx.createRadialGradient(W * 0.76, H * 0.2, 1, W * 0.76, H * 0.2, Math.max(W, H) * 0.4);
+      glow.addColorStop(0, "rgba(0, 180, 220, 0.12)");
+      glow.addColorStop(0.45, "rgba(30, 90, 130, 0.04)");
+      glow.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, W, H);
+
+      for (const s of stars) {
+        const a = s.alpha * (0.6 + Math.sin(time * s.speed + s.phase) * 0.4);
+        ctx.fillStyle = `rgba(200, 240, 255, ${a})`;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const fog = ctx.createLinearGradient(0, H * 0.62, 0, H);
+      fog.addColorStop(0, "rgba(20, 60, 70, 0)");
+      fog.addColorStop(1, "rgba(4, 16, 24, 0.4)");
+      ctx.fillStyle = fog;
+      ctx.fillRect(0, H * 0.58, W, H * 0.42);
+    }
+
+    function drawShadow() {
+      const c = segments[16];
+      const r = bodyR(16) * 3.8;
+      ctx.save();
+      ctx.translate(c.x, Math.min(H - 30, c.y + 120));
+      ctx.scale(1, 0.28);
+      const g = ctx.createRadialGradient(0, 0, 1, 0, 0, r);
+      g.addColorStop(0, "rgba(0,0,0,0.3)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawWing(idx, side) {
+      const root = segments[idx];
+      const next = segments[idx + 3];
+      const f = dir(next, root);
+      const s = normal(f);
+      const sx = s.x * side, sy = s.y * side;
+      const flap = Math.sin(wingT + side * 0.5) * 0.5 + 0.5;
+      const lift = (flap - 0.5) * 48;
+
+      const shoulder = pt(root.x + sx * 24, root.y + sy * 24);
+      const elbow = pt(
+        shoulder.x + sx * 67 - f.x * (30 - lift * 0.42),
+        shoulder.y + sy * 67 - f.y * (30 - lift * 0.42)
+      );
+      const tip = pt(
+        elbow.x + sx * 112 - f.x * (5 + lift * 0.6),
+        elbow.y + sy * 112 - f.y * (5 + lift * 0.6)
+      );
+      const backTip = pt(root.x + sx * 57 + f.x * 85, root.y + sy * 57 + f.y * 85);
+      const lower = pt(root.x + sx * 32 + f.x * 54, root.y + sy * 32 + f.y * 54);
+      const shape = [shoulder, elbow, tip, backTip, lower];
+
+      ctx.save();
+      ctx.shadowColor = colors.glow;
+      ctx.shadowBlur = 16;
+      const mem = ctx.createLinearGradient(shoulder.x, shoulder.y, tip.x, tip.y);
+      mem.addColorStop(0, colors.wing);
+      mem.addColorStop(0.55, colors.bodyLight);
+      mem.addColorStop(1, "rgba(8, 24, 32, 0.35)");
+      fillPath(shape, mem);
+      strokePath(shape, colors.outline, 1.4, 0.75);
+      ctx.restore();
+
+      ctx.save();
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = colors.wingVein;
+      ctx.globalAlpha = 0.65;
+      ctx.lineWidth = 1.15;
+      ctx.beginPath();
+      ctx.moveTo(shoulder.x, shoulder.y);
+      ctx.lineTo(elbow.x, elbow.y);
+      ctx.lineTo(tip.x, tip.y);
+      ctx.stroke();
+
+      for (let i = 1; i <= 5; i++) {
+        const t = i / 6;
+        const bone = pt(mix(elbow.x, tip.x, t), mix(elbow.y, tip.y, t));
+        const mp = pt(mix(lower.x, backTip.x, t * 0.95), mix(lower.y, backTip.y, t * 0.95));
+        ctx.beginPath();
+        ctx.moveTo(shoulder.x, shoulder.y);
+        ctx.lineTo(bone.x, bone.y);
+        ctx.lineTo(mp.x, mp.y);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.fillStyle = colors.bodyLight;
+      ctx.beginPath();
+      ctx.arc(shoulder.x, shoulder.y, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = colors.outline;
+      ctx.globalAlpha = 0.7;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    function drawBelly() {
+      const top = [], bot = [];
+      for (let i = 4; i < segments.length - 4; i++) {
+        const f = dir(segments[i - 1], segments[i + 1]);
+        const s = normal(f);
+        const r = bodyR(i);
+        const off = r * 0.2, w = r * 0.62;
+        top.push(pt(segments[i].x - s.x * off - s.x * w, segments[i].y - s.y * off - s.y * w));
+        bot.push(pt(segments[i].x - s.x * off + s.x * w, segments[i].y - s.y * off + s.y * w));
+      }
+      const belly = top.concat(bot.reverse());
+      const g = ctx.createLinearGradient(
+        segments[4].x, segments[4].y,
+        segments[SEG_N - 5].x, segments[SEG_N - 5].y
+      );
+      g.addColorStop(0, colors.belly);
+      g.addColorStop(1, colors.bellyDark);
+      ctx.save();
+      ctx.globalAlpha = 0.7;
+      fillPath(belly, g);
+      ctx.restore();
+
+      for (let i = 5; i < segments.length - 5; i += 2) {
+        const f = dir(segments[i - 1], segments[i + 1]);
+        const s = normal(f);
+        const r = bodyR(i) * 0.56;
+        ctx.strokeStyle = "rgba(20, 50, 48, 0.35)";
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.moveTo(segments[i].x - s.x * r, segments[i].y - s.y * r);
+        ctx.lineTo(segments[i].x + s.x * r, segments[i].y + s.y * r);
+        ctx.stroke();
+      }
+    }
+
+    function drawScales() {
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.strokeStyle = colors.outline;
+      ctx.lineWidth = 0.7;
+      for (let i = 4; i < segments.length - 6; i += 2) {
+        const f = dir(segments[i - 1], segments[i + 1]);
+        const s = normal(f);
+        const r = bodyR(i) * 0.72;
+        for (let row = -1; row <= 1; row++) {
+          const ox = segments[i].x + s.x * row * r * 0.55;
+          const oy = segments[i].y + s.y * row * r * 0.55;
+          const sz = Math.max(2, r * 0.22);
+          ctx.beginPath();
+          ctx.arc(ox - f.x * sz * 0.25, oy - f.y * sz * 0.25, sz, f.angle - 0.5, f.angle + Math.PI + 0.5);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
+    function drawSpines() {
+      ctx.save();
+      ctx.fillStyle = colors.bodyLight;
+      ctx.strokeStyle = colors.outline;
+      ctx.globalAlpha = 0.75;
+      ctx.lineWidth = 1;
+      for (let i = 3; i < segments.length - 4; i += 2) {
+        const f = dir(segments[i - 1], segments[i + 1]);
+        const s = normal(f);
+        const r = bodyR(i);
+        const h = 6 + r * 0.58;
+        const b1 = pt(segments[i].x + s.x * r * 0.62 - f.x * 5, segments[i].y + s.y * r * 0.62 - f.y * 5);
+        const b2 = pt(segments[i].x + s.x * r * 0.62 + f.x * 5, segments[i].y + s.y * r * 0.62 + f.y * 5);
+        const tip = pt(segments[i].x + s.x * (r + h), segments[i].y + s.y * (r + h));
+        fillPath([b1, tip, b2], colors.bodyLight);
+        strokePath([b1, tip, b2], colors.outline, 0.9, 0.65);
+      }
+      ctx.restore();
+    }
+
+    function drawBody() {
+      const outline = bodyOutline();
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.45)";
+      ctx.shadowBlur = 16;
+      ctx.shadowOffsetY = 8;
+      const c = segments[15];
+      const g = ctx.createRadialGradient(c.x - 25, c.y - 30, 5, c.x, c.y, 180);
+      g.addColorStop(0, colors.bodyLight);
+      g.addColorStop(0.48, colors.body);
+      g.addColorStop(1, "#0a2028");
+      fillPath(outline, g);
+      ctx.restore();
+      strokePath(outline, colors.outline, 1.4, 0.68);
+      drawBelly();
+      drawScales();
+      drawSpines();
+    }
+
+    function drawLeg(idx, side) {
+      const hip = segments[idx];
+      const f = dir(segments[idx - 1], segments[idx + 1]);
+      const s = normal(f);
+      const sx = s.x * side, sy = s.y * side;
+      const stride = Math.sin(wingT * 2.2 + idx * 0.65) * 9;
+      const hipP = pt(hip.x + sx * bodyR(idx) * 0.66, hip.y + sy * bodyR(idx) * 0.66);
+      const shoulder = pt(hipP.x + sx * 28 - f.x * 13 + f.x * stride, hipP.y + sy * 28 - f.y * 13 + f.y * stride);
+      const elbow = pt(shoulder.x + sx * 12 + f.x * 35, shoulder.y + sy * 12 + f.y * 35);
+      const paw = pt(elbow.x + f.x * 19 - sx * 4, elbow.y + f.y * 19 - sy * 4);
+
+      ctx.save();
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(0,0,0,0.38)";
+      ctx.lineWidth = 15;
+      ctx.beginPath();
+      ctx.moveTo(hipP.x, hipP.y);
+      ctx.lineTo(shoulder.x, shoulder.y);
+      ctx.lineTo(elbow.x, elbow.y);
+      ctx.lineTo(paw.x, paw.y);
+      ctx.stroke();
+
+      ctx.strokeStyle = colors.body;
+      ctx.lineWidth = 12;
+      ctx.beginPath();
+      ctx.moveTo(hipP.x, hipP.y);
+      ctx.lineTo(shoulder.x, shoulder.y);
+      ctx.lineTo(elbow.x, elbow.y);
+      ctx.lineTo(paw.x, paw.y);
+      ctx.stroke();
+
+      ctx.strokeStyle = colors.bodyLight;
+      ctx.globalAlpha = 0.6;
+      ctx.lineWidth = 4.5;
+      ctx.beginPath();
+      ctx.moveTo(hipP.x, hipP.y);
+      ctx.lineTo(shoulder.x, shoulder.y);
+      ctx.lineTo(elbow.x, elbow.y);
+      ctx.lineTo(paw.x, paw.y);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      for (let t = -1; t <= 1; t++) {
+        const claw = pt(paw.x + f.x * 13 + sx * t * 8, paw.y + f.y * 13 + sy * t * 8);
+        ctx.strokeStyle = colors.claw;
+        ctx.lineWidth = 2.1;
+        ctx.beginPath();
+        ctx.moveTo(paw.x, paw.y);
+        ctx.lineTo(claw.x, claw.y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawHead() {
+      const head = segments[0];
+      const neck = segments[3];
+      const f = dir(neck, head);
+      const s = normal(f);
+      const hc = pt(head.x + f.x * 8, head.y + f.y * 8);
+      const snout = pt(hc.x + f.x * 49, hc.y + f.y * 49);
+      const topL = pt(hc.x + s.x * 25 - f.x * 10, hc.y + s.y * 25 - f.y * 10);
+      const topR = pt(hc.x - s.x * 25 - f.x * 10, hc.y - s.y * 25 - f.y * 10);
+      const jawL = pt(snout.x + s.x * 15 - f.x * 7, snout.y + s.y * 15 - f.y * 7);
+      const jawR = pt(snout.x - s.x * 15 - f.x * 7, snout.y - s.y * 15 - f.y * 7);
+      const chin = pt(hc.x + f.x * 20, hc.y + f.y * 20);
+
+      const shape = [
+        topL,
+        pt(hc.x + s.x * 22 + f.x * 20, hc.y + s.y * 22 + f.y * 20),
+        jawL, snout, jawR,
+        pt(hc.x - s.x * 22 + f.x * 20, hc.y - s.y * 22 + f.y * 20),
+        topR,
+        pt(hc.x - s.x * 20 - f.x * 22, hc.y - s.y * 20 - f.y * 22),
+        chin,
+        pt(hc.x + s.x * 20 - f.x * 22, hc.y + s.y * 20 - f.y * 22)
+      ];
+
+      ctx.save();
+      ctx.shadowColor = colors.glow;
+      ctx.shadowBlur = 12;
+      const g = ctx.createLinearGradient(hc.x - s.x * 30, hc.y - s.y * 30, hc.x + s.x * 30, hc.y + s.y * 30);
+      g.addColorStop(0, colors.bodyLight);
+      g.addColorStop(0.5, colors.body);
+      g.addColorStop(1, "#0e282e");
+      fillPath(shape, g);
+      strokePath(shape, colors.outline, 1.35, 0.78);
+      ctx.restore();
+
+      // horns
+      for (const [i, base] of [
+        pt(hc.x + s.x * 19 - f.x * 15, hc.y + s.y * 19 - f.y * 15),
+        pt(hc.x - s.x * 19 - f.x * 15, hc.y - s.y * 19 - f.y * 15)
+      ].entries()) {
+        const hs = i === 0 ? 1 : -1;
+        const tip = pt(base.x - f.x * 37 + s.x * hs * 18, base.y - f.y * 37 + s.y * hs * 18);
+        const wide = pt(base.x + s.x * hs * 7, base.y + s.y * hs * 7);
+        fillPath([base, tip, wide], colors.horn);
+        strokePath([base, tip, wide], colors.outline, 1, 0.7);
+      }
+
+      // eyes
+      for (const eye of [
+        pt(hc.x + f.x * 15 + s.x * 13, hc.y + f.y * 15 + s.y * 13),
+        pt(hc.x + f.x * 15 - s.x * 13, hc.y + f.y * 15 - s.y * 13)
+      ]) {
+        ctx.save();
+        ctx.shadowColor = colors.eye;
+        ctx.shadowBlur = 16;
+        ctx.fillStyle = colors.eye;
+        ctx.beginPath();
+        ctx.ellipse(eye.x, eye.y, 4.1, 2.6, f.angle, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#14120e";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(eye.x - s.x * 2.3, eye.y - s.y * 2.3);
+        ctx.lineTo(eye.x + s.x * 2.3, eye.y + s.y * 2.3);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // mouth line
+      ctx.strokeStyle = "rgba(12, 18, 20, 0.7)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(jawL.x - f.x * 2, jawL.y - f.y * 2);
+      ctx.lineTo(jawR.x - f.x * 2, jawR.y - f.y * 2);
+      ctx.stroke();
+
+      // nostrils
+      for (const sign of [-1, 1]) {
+        const n = pt(snout.x - f.x * 10 + s.x * sign * 7, snout.y - f.y * 10 + s.y * sign * 7);
+        ctx.fillStyle = "#060c10";
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      return { mouth: pt(snout.x + f.x * 6, snout.y + f.y * 6), forward: f };
+    }
+
+    function createFire() {
+      const head = segments[0];
+      const neck = segments[3];
+      const f = dir(neck, head);
+      fireEnergy = 1;
+
+      for (let i = 0; i < 70; i++) {
+        const spread = (Math.random() - 0.5) * 0.64;
+        const ang = f.angle + spread;
+        const spd = 2.4 + Math.random() * 9.4;
+        particles.push({
+          x: head.x + f.x * 56,
+          y: head.y + f.y * 56,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd,
+          size: 2 + Math.random() * 6,
+          life: 35 + Math.random() * 44,
+          maxLife: 79,
+          color: colors.fire[Math.floor(Math.random() * colors.fire.length)]
+        });
+      }
+
+      for (let i = 0; i < 16; i++) {
+        sparks.push({
+          x: head.x, y: head.y,
+          radius: 3 + Math.random() * 7,
+          alpha: 0.7 + Math.random() * 0.3
+        });
+      }
+    }
+
+    function drawFire(mouthData) {
+      if (fireEnergy <= 0.02) return;
+      const { mouth, forward } = mouthData;
+      const len = 90 + fireEnergy * 160;
+      const wid = 18 + fireEnergy * 25;
+      const wob = Math.sin(time * 0.02) * 7;
+
+      ctx.save();
+      ctx.translate(mouth.x, mouth.y);
+      ctx.rotate(forward.angle);
+      const g = ctx.createLinearGradient(0, 0, len, 0);
+      g.addColorStop(0, "rgba(255,255,220,1)");
+      g.addColorStop(0.12, "rgba(255,220,68,0.95)");
+      g.addColorStop(0.46, "rgba(255,100,20,0.8)");
+      g.addColorStop(1, "rgba(220,20,0,0)");
+      ctx.fillStyle = g;
+      ctx.shadowColor = "rgba(255,90,15,0.9)";
+      ctx.shadowBlur = 26;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(len * 0.35, -wid - wob, len, 0);
+      ctx.quadraticCurveTo(len * 0.32, wid - wob, 0, 0);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawParticles() {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx; p.y += p.vy;
+        p.vx *= 0.967; p.vy *= 0.967;
+        p.vy += 0.026;
+        p.life -= 1;
+        const a = clamp(p.life / p.maxLife, 0, 1);
+        ctx.save();
+        ctx.globalAlpha = a;
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * a, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+    }
+
+    function drawSparks() {
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const s = sparks[i];
+        s.radius += 2.2;
+        s.alpha -= 0.03;
+        ctx.save();
+        ctx.strokeStyle = `rgba(255,180,50,${Math.max(0, s.alpha)})`;
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        if (s.alpha <= 0) sparks.splice(i, 1);
+      }
+    }
+
+    function drawDragon() {
+      drawShadow();
+      drawWing(8, -1);
+      drawLeg(13, -1);
+      drawLeg(26, -1);
+      drawBody();
+      drawWing(8, 1);
+      drawLeg(13, 1);
+      drawLeg(26, 1);
+      const mouth = drawHead();
+      drawFire(mouth);
+      drawParticles();
+      drawSparks();
+    }
+
+    function changeColor() {
+      palIdx = (palIdx + 1) % palettes.length;
+      colors = palettes[palIdx];
+    }
+
+    function toggleHelp() {
+      helpOn = !helpOn;
+      hud.classList.toggle("hidden", !helpOn);
+    }
+
+    function frame(now) {
+      const dt = Math.min(32, now - last);
+      last = now;
+      if (!paused) update(dt);
+      else time += dt;
+      drawBg();
+      drawDragon();
+      requestAnimationFrame(frame);
+    }
+
+    // Events
+    window.addEventListener("resize", resize);
+    window.addEventListener("mousemove", e => {
+      setPointer(e.clientX, e.clientY);
+      cursorEl.style.left = e.clientX + "px";
+      cursorEl.style.top = e.clientY + "px";
+    });
+    window.addEventListener("mousedown", e => {
+      if (e.button !== 0) return;
+      cursorEl.classList.add("active");
+      createFire();
+    });
+    window.addEventListener("mouseup", () => cursorEl.classList.remove("active"));
+    window.addEventListener("touchstart", e => {
+      const t = e.touches[0];
+      if (t) setPointer(t.clientX, t.clientY);
+      createFire();
+    }, { passive: true });
+    window.addEventListener("touchmove", e => {
+      const t = e.touches[0];
+      if (t) setPointer(t.clientX, t.clientY);
+    }, { passive: true });
+    window.addEventListener("keydown", e => {
+      const k = e.key.toLowerCase();
+      if (e.code === "Space") { e.preventDefault(); paused = !paused; }
+      if (k === "f") createFire();
+      if (k === "c") changeColor();
+      if (k === "r") resetDragon();
+      if (k === "h") toggleHelp();
+    });
+
+    document.getElementById("btnFire").addEventListener("click", createFire);
+    document.getElementById("btnColor").addEventListener("click", changeColor);
+    document.getElementById("btnHelp").addEventListener("click", toggleHelp);
+
+    resize();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
