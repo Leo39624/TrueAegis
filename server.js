@@ -36,46 +36,11 @@ const GOOGLE_CLOUD_LOCATION =
 
 const BASE_URL =
     process.env.BASE_URL ||
-    "https://trueaegis.onrender.com";
-
-const publicPath =
-    path.join(__dirname, "public");
-
-// ============================================================
-// GOOGLE OAUTH CONFIGURATION
-// ============================================================
-
-const GOOGLE_CLIENT_ID =
-    process.env.GOOGLE_CLIENT_ID;
-
-const GOOGLE_CLIENT_SECRET =
-    process.env.GOOGLE_CLIENT_SECRET;
-
-const GOOGLE_REDIRECT_URI =
-    process.env.GOOGLE_REDIRECT_URI ||
-    `${BASE_URL}/api/auth/google/callback`;
-
-const googleOAuthClient =
-    GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET
-        ? new OAuth2Client(
-            GOOGLE_CLIENT_ID,
-            GOOGLE_CLIENT_SECRET,
-            GOOGLE_REDIRECT_URI
-        )
-        : null;
-
-// Temporary OAuth state storage.
-// In production, this should ideally be stored in a
-// server-side session/Redis store for multi-instance deployments.
-const googleOAuthStates = new Map();
-
-const GOOGLE_STATE_TTL = 10 * 60 * 1000;
+    `http://localhost:${PORT}`;
 
 // ============================================================
 // MIDDLEWARE
 // ============================================================
-
-app.disable("x-powered-by");
 
 app.use(
     cors({
@@ -98,874 +63,142 @@ app.use(
 );
 
 // ============================================================
-// REQUEST LOGGER
-// ============================================================
-
-app.use((req, res, next) => {
-
-    console.log(
-        `${new Date().toISOString()} | ${req.method} ${req.originalUrl}`
-    );
-
-    next();
-});
-
-// ============================================================
-// STATIC FRONTEND
+// STATIC FILES
 // ============================================================
 
 app.use(
-    express.static(publicPath, {
-        extensions: ["html"],
-        maxAge: "1h"
-    })
+    express.static(
+        path.join(__dirname, "public")
+    )
 );
 
 // ============================================================
-// ROBOTS.TXT
+// DATABASE
 // ============================================================
 
-app.get(
-    "/robots.txt",
-    (req, res) => {
+mongoose.set(
+    "strictQuery",
+    true
+);
 
-        res.type("text/plain");
+async function connectMongoDB() {
+    const uri =
+        process.env.MONGODB_URI;
 
-        res.send(
-            `User-agent: *
-Allow: /
-Sitemap: ${BASE_URL}/sitemap.xml
-`
+    if (!uri) {
+        console.error(
+            "❌ MONGODB_URI is missing."
+        );
+        return;
+    }
+
+    try {
+        await mongoose.connect(uri, {
+            serverSelectionTimeoutMS:
+                10000
+        });
+
+        console.log(
+            "✅ MongoDB Connected"
         );
     }
-);
-
-// ============================================================
-// SITEMAP.XML
-// ============================================================
-
-app.get(
-    "/sitemap.xml",
-    (req, res) => {
-
-        res.type("application/xml");
-
-        res.send(
-            `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-
-<url>
-<loc>${BASE_URL}/</loc>
-</url>
-
-<url>
-<loc>${BASE_URL}/dragon.html</loc>
-</url>
-
-</urlset>`
+    catch (error) {
+        console.error(
+            "❌ MongoDB Connection Error:",
+            error.message
         );
     }
-);
+}
 
 // ============================================================
-// GEMINI CONFIGURATION
+// GEMINI
 // ============================================================
 
 let geminiClient = null;
-let geminiMode = "disabled";
 
 function initializeGemini() {
+    const apiKey =
+        process.env.GEMINI_API_KEY;
 
-    /*
-        MODE 1
-        --------------------------------------------------------
-        Gemini Developer API
-
-        Uses:
-            GEMINI_API_KEY
-
-        The API key remains on the server.
-    */
-
-    if (
-        process.env.GEMINI_API_KEY &&
-        process.env.GEMINI_API_KEY.trim()
-    ) {
-
-        try {
-
-            geminiClient =
-                new GoogleGenAI({
-                    apiKey:
-                        process.env.GEMINI_API_KEY.trim()
-                });
-
-            geminiMode =
-                "gemini-api";
-
-            console.log(
-                "🤖 Gemini: Developer API mode enabled"
-            );
-
-            return;
-
-        }
-        catch (error) {
-
-            console.error(
-                "❌ Failed to initialize Gemini API client:",
-                error.message
-            );
-        }
+    if (!apiKey) {
+        console.warn(
+            "⚠️ GEMINI_API_KEY is not configured."
+        );
+        return;
     }
 
-    /*
-        MODE 2
-        --------------------------------------------------------
-        Google Cloud Vertex AI
-    */
+    try {
+        geminiClient =
+            new GoogleGenAI({
+                apiKey
+            });
 
-    if (
-        process.env.GOOGLE_CLOUD_PROJECT &&
-        process.env.GOOGLE_CLOUD_PROJECT.trim()
-    ) {
-
-        try {
-
-            geminiClient =
-                new GoogleGenAI({
-
-                    vertexai:
-                        true,
-
-                    project:
-                        process.env.GOOGLE_CLOUD_PROJECT.trim(),
-
-                    location:
-                        GOOGLE_CLOUD_LOCATION
-                });
-
-            geminiMode =
-                "vertex-ai";
-
-            console.log(
-                "☁️ Gemini: Vertex AI mode enabled"
-            );
-
-            return;
-
-        }
-        catch (error) {
-
-            console.error(
-                "❌ Failed to initialize Vertex AI client:",
-                error.message
-            );
-        }
+        console.log(
+            "🤖 Gemini: Developer API mode enabled"
+        );
     }
-
-    console.warn(
-        "⚠️ Gemini is not configured."
-    );
+    catch (error) {
+        console.error(
+            "❌ Gemini initialization failed:",
+            error.message
+        );
+    }
 }
 
-// Initialize Gemini
-initializeGemini();
-
 // ============================================================
-// GEMINI HELPER
+// GEMINI GENERATION HELPER
 // ============================================================
 
 async function callGemini(
     contents,
     options = {}
 ) {
-
     if (!geminiClient) {
-
         throw new Error(
             "Gemini is not configured on the server."
         );
     }
 
-    const model =
-        options.model ||
-        GEMINI_MODEL;
-
-    try {
-
-        const response =
-            await geminiClient.models.generateContent({
-
-                model,
+    const response =
+        await geminiClient.models.generateContent(
+            {
+                model:
+                    options.model ||
+                    GEMINI_MODEL,
 
                 contents,
 
                 config: {
-
                     temperature:
                         options.temperature ??
                         0.2,
 
                     maxOutputTokens:
                         options.maxOutputTokens ??
-                        1400
+                        1200
                 }
-            });
-
-        const text =
-            response?.text ||
-            "";
-
-        if (!text.trim()) {
-
-            throw new Error(
-                "Gemini returned an empty response."
-            );
-        }
-
-        return text;
-    }
-
-    catch (error) {
-
-        console.error(
-            "❌ GEMINI REQUEST FAILED"
+            }
         );
 
-        console.error(
-            "Mode:",
-            geminiMode
-        );
-
-        console.error(
-            "Model:",
-            model
-        );
-
-        console.error(
-            "Message:",
-            error.message
-        );
-
-        const message =
-            String(
-                error.message ||
-                ""
-            );
-
-        if (
-            message.includes(
-                "ACCESS_TOKEN_TYPE_UNSUPPORTED"
-            ) ||
-            message.includes(
-                "Expected OAuth 2 access token"
-            ) ||
-            message.includes(
-                "invalid authentication credentials"
+    const text =
+        response?.text ||
+        response?.candidates?.[0]
+            ?.content?.parts
+            ?.map(
+                part =>
+                    part.text || ""
             )
-        ) {
+            .join("") ||
+        "";
 
-            const authError =
-                new Error(
-                    "Gemini authentication was rejected by Google. " +
-                    "Configure valid Gemini API or Vertex AI credentials."
-                );
-
-            authError.status =
-                401;
-
-            authError.code =
-                "GEMINI_AUTH_REJECTED";
-
-            throw authError;
-        }
-
-        throw error;
-    }
-}
-
-// ============================================================
-// GOOGLE LOGIN
-// ============================================================
-
-function createGoogleState() {
-
-    return crypto.randomBytes(32).toString("hex");
-}
-
-// ------------------------------------------------------------
-// START GOOGLE LOGIN
-// ------------------------------------------------------------
-
-app.get(
-    "/api/auth/google",
-    (req, res) => {
-
-        if (!googleOAuthClient) {
-
-            return res.redirect(
-                "/?google=error&message=" +
-                encodeURIComponent(
-                    "Google Login is not configured on the server."
-                )
-            );
-        }
-
-        const state =
-            createGoogleState();
-
-        googleOAuthStates.set(
-            state,
-            {
-                createdAt:
-                    Date.now()
-            }
-        );
-
-        const authorizationUrl =
-            googleOAuthClient.generateAuthUrl({
-
-                access_type:
-                    "online",
-
-                scope: [
-                    "openid",
-                    "email",
-                    "profile"
-                ],
-
-                state,
-
-                prompt:
-                    "select_account"
-            });
-
-        res.redirect(
-            authorizationUrl
+    if (!text.trim()) {
+        throw new Error(
+            "Gemini returned an empty response."
         );
     }
-);
 
-// ------------------------------------------------------------
-// GOOGLE CALLBACK
-// ------------------------------------------------------------
-
-app.get(
-    "/api/auth/google/callback",
-    async (req, res) => {
-
-        try {
-
-            if (!googleOAuthClient) {
-
-                return res.redirect(
-                    "/?google=error&message=" +
-                    encodeURIComponent(
-                        "Google Login is not configured."
-                    )
-                );
-            }
-
-            const {
-                code,
-                state,
-                error
-            } = req.query;
-
-            if (error) {
-
-                return res.redirect(
-                    "/?google=error&message=" +
-                    encodeURIComponent(
-                        "Google Login was cancelled."
-                    )
-                );
-            }
-
-            if (!code || !state) {
-
-                return res.redirect(
-                    "/?google=error&message=" +
-                    encodeURIComponent(
-                        "Invalid Google authentication response."
-                    )
-                );
-            }
-
-            // ------------------------------------------------
-            // VERIFY STATE
-            // ------------------------------------------------
-
-            const stateRecord =
-                googleOAuthStates.get(
-                    state
-                );
-
-            googleOAuthStates.delete(
-                state
-            );
-
-            if (!stateRecord) {
-
-                return res.redirect(
-                    "/?google=error&message=" +
-                    encodeURIComponent(
-                        "Google authentication session expired."
-                    )
-                );
-            }
-
-            if (
-                Date.now() -
-                stateRecord.createdAt >
-                GOOGLE_STATE_TTL
-            ) {
-
-                return res.redirect(
-                    "/?google=error&message=" +
-                    encodeURIComponent(
-                        "Google authentication session expired."
-                    )
-                );
-            }
-
-            // ------------------------------------------------
-            // EXCHANGE AUTHORIZATION CODE
-            // ------------------------------------------------
-
-            const {
-                tokens
-            } =
-                await googleOAuthClient.getToken(
-                    code
-                );
-
-            if (!tokens.id_token) {
-
-                return res.redirect(
-                    "/?google=error&message=" +
-                    encodeURIComponent(
-                        "Google did not return a valid identity token."
-                    )
-                );
-            }
-
-            // ------------------------------------------------
-            // VERIFY GOOGLE ID TOKEN
-            // ------------------------------------------------
-
-            const ticket =
-                await googleOAuthClient.verifyIdToken({
-
-                    idToken:
-                        tokens.id_token,
-
-                    audience:
-                        GOOGLE_CLIENT_ID
-                });
-
-            const payload =
-                ticket.getPayload();
-
-            if (!payload) {
-
-                throw new Error(
-                    "Google identity information was unavailable."
-                );
-            }
-
-            const googleId =
-                payload.sub;
-
-            const email =
-                payload.email
-                    ?.trim()
-                    .toLowerCase();
-
-            const emailVerified =
-                payload.email_verified;
-
-            const name =
-                payload.name ||
-                payload.given_name ||
-                "TrueAegis User";
-
-            const picture =
-                payload.picture ||
-                "";
-
-            if (!googleId || !email) {
-
-                throw new Error(
-                    "Google account information is incomplete."
-                );
-            }
-
-            if (!emailVerified) {
-
-                throw new Error(
-                    "Your Google email address is not verified."
-                );
-            }
-
-            // ------------------------------------------------
-            // FIND USER MODEL
-            // ------------------------------------------------
-
-            /*
-                Your existing authentication system owns the
-                User model.
-
-                We try to load it from the existing auth route
-                module if it is exported.
-            */
-
-            let User = null;
-
-            try {
-
-                if (
-                    authRoutes &&
-                    authRoutes.User
-                ) {
-
-                    User =
-                        authRoutes.User;
-                }
-
-            }
-            catch (error) {
-
-                console.error(
-                    "Could not access User model:",
-                    error.message
-                );
-            }
-
-            /*
-                If the model is not exported by routes/auth,
-                Google login cannot safely modify the existing
-                user database automatically.
-            */
-
-            if (!User) {
-
-                return res.redirect(
-                    "/?google=error&message=" +
-                    encodeURIComponent(
-                        "Google Login backend is not connected to the existing User model yet."
-                    )
-                );
-            }
-
-            // ------------------------------------------------
-            // FIND EXISTING USER
-            // ------------------------------------------------
-
-            let user =
-                await User.findOne({
-                    $or: [
-                        {
-                            googleId:
-                                googleId
-                        },
-                        {
-                            email:
-                                email
-                        }
-                    ]
-                });
-
-            // ------------------------------------------------
-            // CREATE USER IF NECESSARY
-            // ------------------------------------------------
-
-            if (!user) {
-
-                user =
-                    await User.create({
-
-                        fullName:
-                            name,
-
-                        name:
-                            name,
-
-                        email:
-                            email,
-
-                        googleId:
-                            googleId,
-
-                        profilePicture:
-                            picture,
-
-                        emailVerified:
-                            true,
-
-                        authProvider:
-                            "google"
-                    });
-
-                console.log(
-                    `✅ New Google user created: ${email}`
-                );
-            }
-
-            else {
-
-                // ------------------------------------------------
-                // LINK GOOGLE ACCOUNT TO EXISTING USER
-                // ------------------------------------------------
-
-                let changed =
-                    false;
-
-                if (
-                    !user.googleId
-                ) {
-
-                    user.googleId =
-                        googleId;
-
-                    changed =
-                        true;
-                }
-
-                if (
-                    !user.emailVerified
-                ) {
-
-                    user.emailVerified =
-                        true;
-
-                    changed =
-                        true;
-                }
-
-                if (
-                    picture &&
-                    !user.profilePicture
-                ) {
-
-                    user.profilePicture =
-                        picture;
-
-                    changed =
-                        true;
-                }
-
-                if (
-                    !user.authProvider
-                ) {
-
-                    user.authProvider =
-                        "google";
-
-                    changed =
-                        true;
-                }
-
-                if (changed) {
-
-                    await user.save();
-                }
-            }
-
-            // ------------------------------------------------
-            // CREATE APPLICATION JWT
-            // ------------------------------------------------
-
-            const jwt =
-                require("jsonwebtoken");
-
-            if (
-                !process.env.JWT_SECRET
-            ) {
-
-                throw new Error(
-                    "JWT_SECRET is not configured."
-                );
-            }
-
-            const token =
-                jwt.sign(
-                    {
-                        id:
-                            user._id.toString(),
-
-                        userId:
-                            user._id.toString(),
-
-                        email:
-                            user.email
-                    },
-
-                    process.env.JWT_SECRET,
-
-                    {
-                        expiresIn:
-                            "7d"
-                    }
-                );
-
-            // ------------------------------------------------
-            // SECURE COOKIE
-            // ------------------------------------------------
-
-            res.cookie(
-                "trueaegis_token",
-                token,
-                {
-                    httpOnly:
-                        true,
-
-                    secure:
-                        process.env.NODE_ENV ===
-                        "production",
-
-                    sameSite:
-                        "lax",
-
-                    maxAge:
-                        7 *
-                        24 *
-                        60 *
-                        60 *
-                        1000,
-
-                    path:
-                        "/"
-                }
-            );
-
-            console.log(
-                `✅ Google Login successful: ${email}`
-            );
-
-            // ------------------------------------------------
-            // RETURN TO FRONTEND
-            // ------------------------------------------------
-
-            return res.redirect(
-                "/?google=success"
-            );
-        }
-
-        catch (error) {
-
-            console.error(
-                "❌ GOOGLE LOGIN ERROR:",
-                error
-            );
-
-            return res.redirect(
-                "/?google=error&message=" +
-                encodeURIComponent(
-                    "Google Login failed. Please try again."
-                )
-            );
-        }
-    }
-);
-
-// ============================================================
-// GOOGLE STATE CLEANUP
-// ============================================================
-
-setInterval(
-    () => {
-
-        const now =
-            Date.now();
-
-        for (
-            const [
-                state,
-                record
-            ]
-            of googleOAuthStates
-        ) {
-
-            if (
-                now -
-                record.createdAt >
-                GOOGLE_STATE_TTL
-            ) {
-
-                googleOAuthStates.delete(
-                    state
-                );
-            }
-        }
-
-    },
-    5 * 60 * 1000
-);
-
-// ============================================================
-// HEALTH CHECK
-// ============================================================
-
-app.get(
-    "/api/health",
-    (req, res) => {
-
-        res.json({
-
-            success:
-                true,
-
-            message:
-                "TrueAegis API is running",
-
-            server:
-                "online",
-
-            mongodb:
-                mongoose.connection.readyState === 1
-                    ? "connected"
-                    : "disconnected",
-
-            ai: {
-
-                perplexity:
-                    Boolean(
-                        process.env.PERPLEXITY_API_KEY
-                    ),
-
-                gemini:
-                    Boolean(
-                        geminiClient
-                    ),
-
-                geminiMode:
-                    geminiMode,
-
-                geminiModel:
-                    GEMINI_MODEL
-            },
-
-            googleLogin:
-                Boolean(
-                    googleOAuthClient
-                ),
-
-            time:
-                new Date().toISOString()
-        });
-    }
-);
-
-// ============================================================
-// AUTHENTICATION ROUTES
-// ============================================================
-
-app.use(
-    "/api/auth",
-    authRoutes
-);
+    return text;
+}
 
 // ============================================================
 // PERPLEXITY HELPER
@@ -975,397 +208,493 @@ async function callPerplexity(
     messages,
     options = {}
 ) {
-
     const apiKey =
         process.env.PERPLEXITY_API_KEY;
 
     if (!apiKey) {
-
         throw new Error(
             "PERPLEXITY_API_KEY is missing."
         );
     }
 
-    const response =
-        await fetch(
-            "https://api.perplexity.ai/chat/completions",
-            {
-                method:
-                    "POST",
+    const maxAttempts =
+        options.retries ?? 2;
 
-                headers: {
+    let lastError = null;
 
-                    "Authorization":
-                        `Bearer ${apiKey}`,
+    for (
+        let attempt = 0;
+        attempt <= maxAttempts;
+        attempt++
+    ) {
+        try {
+            const response =
+                await fetch(
+                    "https://api.perplexity.ai/chat/completions",
+                    {
+                        method:
+                            "POST",
 
-                    "Content-Type":
-                        "application/json"
-                },
+                        headers: {
+                            "Authorization":
+                                `Bearer ${apiKey}`,
 
-                body:
-                    JSON.stringify({
+                            "Content-Type":
+                                "application/json"
+                        },
 
-                        model:
-                            options.model ||
-                            "sonar",
+                        body:
+                            JSON.stringify({
+                                model:
+                                    options.model ||
+                                    "sonar",
 
-                        messages,
+                                messages,
 
-                        temperature:
-                            options.temperature ??
-                            0.2,
+                                temperature:
+                                    options.temperature ??
+                                    0.2,
 
-                        max_tokens:
-                            options.max_tokens ??
-                            1200
-                    })
+                                max_tokens:
+                                    options.max_tokens ??
+                                    1200
+                            })
+                    }
+                );
+
+            const data =
+                await response.json();
+
+            if (!response.ok) {
+                const error =
+                    new Error(
+                        data?.error?.message ||
+                        "Perplexity API request failed."
+                    );
+
+                error.status =
+                    response.status;
+
+                error.providerData =
+                    data;
+
+                const temporary =
+                    [
+                        429,
+                        500,
+                        502,
+                        503,
+                        504
+                    ].includes(
+                        response.status
+                    );
+
+                if (
+                    temporary &&
+                    attempt < maxAttempts
+                ) {
+                    const delay =
+                        500 *
+                        Math.pow(
+                            2,
+                            attempt
+                        );
+
+                    console.warn(
+                        `⚠️ Perplexity temporary error ${response.status}. ` +
+                        `Retrying in ${delay}ms...`
+                    );
+
+                    await new Promise(
+                        resolve =>
+                            setTimeout(
+                                resolve,
+                                delay
+                            )
+                    );
+
+                    continue;
+                }
+
+                throw error;
             }
-        );
 
-    const data =
-        await response.json();
+            const reply =
+                data
+                    ?.choices?.[0]
+                    ?.message
+                    ?.content ||
+                "";
 
-    if (!response.ok) {
+            if (!reply.trim()) {
+                throw new Error(
+                    "Perplexity returned an empty response."
+                );
+            }
 
-        const error =
-            new Error(
-                data?.error?.message ||
-                "Perplexity API request failed."
-            );
+            return reply;
+        }
+        catch (error) {
+            lastError =
+                error;
 
-        error.status =
-            response.status;
+            const temporary =
+                [
+                    429,
+                    500,
+                    502,
+                    503,
+                    504
+                ].includes(
+                    error?.status
+                );
 
-        error.providerData =
-            data;
+            if (
+                temporary &&
+                attempt < maxAttempts
+            ) {
+                const delay =
+                    500 *
+                    Math.pow(
+                        2,
+                        attempt
+                    );
 
-        throw error;
+                console.warn(
+                    `⚠️ Perplexity request failed. ` +
+                    `Retrying in ${delay}ms...`
+                );
+
+                await new Promise(
+                    resolve =>
+                        setTimeout(
+                            resolve,
+                            delay
+                        )
+                );
+
+                continue;
+            }
+
+            throw error;
+        }
     }
 
-    const text =
-        data
-            ?.choices?.[0]
-            ?.message
-            ?.content ||
-        "";
-
-    if (!text.trim()) {
-
-        throw new Error(
-            "Perplexity returned an empty response."
-        );
-    }
-
-    return text;
+    throw (
+        lastError ||
+        new Error(
+            "Perplexity request failed."
+        )
+    );
 }
 
 // ============================================================
-// GEMINI CHATBOT
+// AUTH ROUTES
+// ============================================================
+
+app.use(
+    "/api/auth",
+    authRoutes
+);
+
+// ============================================================
+// HEALTH CHECK
+// ============================================================
+
+app.get(
+    "/api/health",
+    async (req, res) => {
+        res.json({
+            success: true,
+
+            status:
+                "TRUEAEGIS ONLINE",
+
+            server:
+                "running",
+
+            database:
+                mongoose.connection
+                    .readyState === 1
+                    ? "connected"
+                    : "disconnected",
+
+            ai: {
+                gemini:
+                    !!geminiClient,
+
+                perplexity:
+                    !!process.env
+                        .PERPLEXITY_API_KEY,
+
+                geminiMode:
+                    "gemini-api",
+
+                geminiModel:
+                    GEMINI_MODEL
+            },
+
+            timestamp:
+                new Date().toISOString()
+        });
+    }
+);
+
+// ============================================================
+// ROOT
+// ============================================================
+
+app.get(
+    "/",
+    (req, res) => {
+        res.sendFile(
+            path.join(
+                __dirname,
+                "public",
+                "index.html"
+            )
+        );
+    }
+);
+
+// ============================================================
+// AI CHATBOT - AEGIS
 // ============================================================
 
 app.post(
-    "/api/chat",
+    "/api/ai-chat",
     async (req, res) => {
-
         try {
-
             const {
                 message,
-                history = []
+                messages,
+                history
             } = req.body;
 
-            if (!message) {
-
+            if (
+                !message &&
+                !messages &&
+                !history
+            ) {
                 return res.status(400).json({
-
-                    success:
-                        false,
-
+                    success: false,
                     message:
-                        "Message is required."
+                        "Please provide a message."
                 });
             }
 
-            const contents = [];
+            let chatMessages = [];
 
-            for (
-                const item
-                of history
+            if (
+                Array.isArray(messages)
             ) {
-
-                if (
-                    item?.role &&
-                    item?.content
-                ) {
-
-                    contents.push({
-
-                        role:
-                            item.role ===
-                            "assistant"
-                                ? "model"
-                                : "user",
-
-                        parts: [
-                            {
-                                text:
-                                    String(
-                                        item.content
-                                    )
-                            }
-                        ]
-                    });
-                }
+                chatMessages =
+                    messages;
             }
-
-            contents.push({
-
-                role:
-                    "user",
-
-                parts: [
+            else if (
+                Array.isArray(history)
+            ) {
+                chatMessages =
+                    history;
+            }
+            else {
+                chatMessages = [
                     {
-                        text:
+                        role:
+                            "user",
+
+                        content:
                             String(
                                 message
                             )
                     }
-                ]
-            });
-
-            const reply =
-                await callGemini(
-                    contents,
-                    {
-                        temperature:
-                            0.3,
-
-                        maxOutputTokens:
-                            1400
-                    }
-                );
-
-            return res.json({
-
-                success:
-                    true,
-
-                reply
-            });
-        }
-
-        catch (error) {
-
-            console.error(
-                "CHAT ERROR:",
-                error
-            );
-
-            return res.status(
-                error.status || 500
-            ).json({
-
-                success:
-                    false,
-
-                message:
-                    error.message ||
-                    "AI chatbot request failed."
-            });
-        }
-    }
-);
-
-// ============================================================
-// PERPLEXITY NEWS ANALYSIS
-// ============================================================
-
-app.post(
-    "/api/news-analysis",
-    async (req, res) => {
-
-        try {
-
-            const {
-                query,
-                text
-            } = req.body;
-
-            const input =
-                query ||
-                text;
-
-            if (!input) {
-
-                return res.status(400).json({
-
-                    success:
-                        false,
-
-                    message:
-                        "News query or text is required."
-                });
+                ];
             }
 
-            const result =
-                await callPerplexity(
-                    [
+            chatMessages =
+                chatMessages
+                    .filter(
+                        item =>
+                            item &&
+                            item.content
+                    )
+                    .slice(-20);
+
+            const systemMessage = {
+                role:
+                    "system",
+
+                content:
+                    `You are Aegis, the AI assistant inside TrueAegis.
+
+TrueAegis is a Digital Trust Intelligence Platform designed to help users investigate potentially manipulated media, verify content, analyze news, and understand digital evidence.
+
+Your job is to be:
+- helpful
+- calm
+- accurate
+- curious
+- professional
+- easy to understand
+
+Important rules:
+1. Never claim that AI analysis is absolute proof.
+2. Clearly distinguish evidence, indicators, uncertainty, and conclusions.
+3. When discussing potentially manipulated media, explain that AI detection can produce false positives and false negatives.
+4. Encourage users to verify important claims using independent evidence.
+5. Do not invent sources, evidence, statistics, or investigation results.
+6. If you do not know something, say so.
+7. Keep answers concise unless the user asks for detail.
+8. Do not present speculation as fact.
+9. For safety-sensitive topics, give responsible general information.
+10. You are an AI assistant, not a forensic laboratory or legal authority.
+
+When useful, structure answers using:
+- Assessment
+- Evidence
+- Limitations
+- Recommended verification steps`
+            };
+
+            const perplexityMessages = [
+                systemMessage,
+                ...chatMessages
+            ];
+
+            // =================================================
+            // PRIMARY: PERPLEXITY
+            // FALLBACK: GEMINI
+            // =================================================
+
+            let reply;
+            let provider =
+                "perplexity";
+
+            try {
+                reply =
+                    await callPerplexity(
+                        perplexityMessages,
                         {
-                            role:
-                                "system",
+                            model:
+                                "sonar",
 
-                            content:
-                                "You are TrueAegis News Intelligence. Analyze news claims carefully. Separate verified facts, uncertain claims, conflicting reports, and missing context. Do not invent sources."
-                        },
+                            temperature:
+                                0.25,
 
-                        {
-                            role:
-                                "user",
+                            max_tokens:
+                                1400,
 
-                            content:
-                                String(
-                                    input
-                                )
+                            retries:
+                                1
                         }
-                    ],
-                    {
-                        model:
-                            "sonar",
-
-                        temperature:
-                            0.1,
-
-                        max_tokens:
-                            1600
-                    }
+                    );
+            }
+            catch (
+                perplexityError
+            ) {
+                console.warn(
+                    "⚠️ Aegis Perplexity unavailable. " +
+                    "Trying Gemini fallback..."
                 );
 
-            return res.json({
+                if (!geminiClient) {
+                    throw perplexityError;
+                }
 
-                success:
-                    true,
+                const geminiContents =
+                    perplexityMessages
+                        .filter(
+                            item =>
+                                item?.role &&
+                                item?.content
+                        )
+                        .map(
+                            item => ({
+                                role:
+                                    item.role ===
+                                    "assistant"
+                                        ? "model"
+                                        : "user",
 
-                analysis:
-                    result
-            });
-        }
+                                parts: [
+                                    {
+                                        text:
+                                            String(
+                                                item.content
+                                            )
+                                    }
+                                ]
+                            })
+                        );
 
-        catch (error) {
+                reply =
+                    await callGemini(
+                        geminiContents,
+                        {
+                            temperature:
+                                0.25,
 
-            console.error(
-                "NEWS ANALYSIS ERROR:",
-                error
-            );
+                            maxOutputTokens:
+                                1400
+                        }
+                    );
 
-            return res.status(
-                error.status || 500
-            ).json({
-
-                success:
-                    false,
-
-                message:
-                    error.message ||
-                    "News analysis failed."
-            });
-        }
-    }
-);
-
-// ============================================================
-// CONTENT ANALYSIS
-// ============================================================
-
-app.post(
-    "/api/content-analysis",
-    async (req, res) => {
-
-        try {
-
-            const {
-                content,
-                text
-            } = req.body;
-
-            const input =
-                content ||
-                text;
-
-            if (!input) {
-
-                return res.status(400).json({
-
-                    success:
-                        false,
-
-                    message:
-                        "Content is required."
-                });
+                provider =
+                    "gemini-fallback";
             }
 
-            const analysis =
-                await callGemini(
-                    [
-                        {
-                            role:
-                                "user",
-
-                            parts: [
-                                {
-                                    text:
-                                        `You are TrueAegis AI, a digital trust analysis system.
-
-Analyze the following content for:
-1. factual reliability
-2. suspicious or misleading claims
-3. unsupported statements
-4. important missing context
-5. confidence level
-
-Do not claim certainty when the available information is insufficient.
-
-CONTENT:
-
-${String(input)}`
-                                }
-                            ]
-                        }
-                    ],
-                    {
-                        temperature:
-                            0.15,
-
-                        maxOutputTokens:
-                            1800
-                    }
-                );
-
             return res.json({
-
                 success:
                     true,
 
-                analysis
+                reply,
+
+                provider
             });
         }
-
         catch (error) {
-
             console.error(
-                "CONTENT ANALYSIS ERROR:",
-                error
+                "❌ Aegis chatbot error:",
+                error.message
             );
 
-            return res.status(
-                error.status || 500
-            ).json({
+            const status =
+                error.status ||
+                500;
 
+            let userMessage =
+                "Aegis is temporarily unavailable. Please try again in a moment.";
+
+            if (
+                status === 429
+            ) {
+                userMessage =
+                    "Aegis is receiving too many requests right now. Please try again shortly.";
+            }
+            else if (
+                status === 503 ||
+                status === 502 ||
+                status === 504
+            ) {
+                userMessage =
+                    "Aegis AI is temporarily busy. Please try again in a moment.";
+            }
+            else if (
+                status === 401 ||
+                status === 403
+            ) {
+                userMessage =
+                    "Aegis AI credentials need attention on the server.";
+            }
+
+            return res.status(
+                status
+            ).json({
                 success:
                     false,
 
                 message:
-                    error.message ||
-                    "Content analysis failed."
+                    userMessage
             });
         }
     }
@@ -1378,101 +707,262 @@ ${String(input)}`
 app.post(
     "/api/media-analysis",
     async (req, res) => {
-
         try {
+            if (!geminiClient) {
+                return res.status(503).json({
+                    success: false,
+
+                    message:
+                        "Media analysis AI is not configured on the server."
+                });
+            }
 
             const {
-                data,
+                image,
+                media,
                 mimeType,
-                fileName
+                filename
             } = req.body;
 
-            if (!data) {
+            const inputData =
+                image ||
+                media;
 
+            if (!inputData) {
                 return res.status(400).json({
-
-                    success:
-                        false,
+                    success: false,
 
                     message:
-                        "Media data is required."
+                        "No media was provided."
                 });
             }
 
-            if (!mimeType) {
-
-                return res.status(400).json({
-
-                    success:
-                        false,
-
-                    message:
-                        "Media MIME type is required."
-                });
-            }
+            let base64Data =
+                String(
+                    inputData
+                );
 
             if (
-                !(
-                    mimeType.startsWith(
-                        "image/"
-                    ) ||
-                    mimeType.startsWith(
-                        "video/"
-                    )
+                base64Data.includes(
+                    ","
                 )
             ) {
+                base64Data =
+                    base64Data.split(
+                        ","
+                    )[1];
+            }
 
-                return res.status(400).json({
+            const detectedMime =
+                mimeType ||
+                "image/jpeg";
 
-                    success:
-                        false,
+            const prompt =
+                `You are TrueAegis Forensic Lens, an AI-assisted media analysis system.
+
+Analyze the supplied media for indicators that may suggest manipulation, synthetic generation, editing, compositing, or other anomalies.
+
+IMPORTANT:
+Your output is an AI assessment, NOT definitive proof that media is authentic or fake.
+
+Do not make absolute claims.
+
+Return a professional structured forensic report using EXACTLY these sections:
+
+SUSPICION LEVEL:
+Give one:
+LOW
+MEDIUM
+HIGH
+UNCERTAIN
+
+OVERALL ASSESSMENT:
+Give a concise assessment and explain that it is an AI-assisted assessment rather than definitive proof.
+
+EVIDENCE:
+List the observable indicators that influenced the assessment.
+Focus on visible or technically inferable evidence.
+Do not invent hidden metadata or facts that cannot be observed.
+
+LIMITATIONS:
+Explain important limitations of analyzing this media, including uncertainty, compression, resolution, missing metadata, or inability to verify source history where relevant.
+
+VERIFICATION STEPS:
+Give practical ways a user could independently verify the media, such as checking the original source, reverse-searching, comparing with trusted sources, checking metadata when available, or obtaining the original file.
+
+CONFIDENCE:
+Give a qualitative confidence level:
+LOW
+MEDIUM
+HIGH
+
+Remember:
+- AI detection can make mistakes.
+- A suspicious indicator does not automatically mean manipulation.
+- Lack of suspicious indicators does not prove authenticity.
+- Never claim laboratory-grade forensic certainty.`;
+
+            const response =
+                await geminiClient.models.generateContent(
+                    {
+                        model:
+                            GEMINI_MODEL,
+
+                        contents: [
+                            {
+                                role:
+                                    "user",
+
+                                parts: [
+                                    {
+                                        inlineData: {
+                                            mimeType:
+                                                detectedMime,
+
+                                            data:
+                                                base64Data
+                                        }
+                                    },
+
+                                    {
+                                        text:
+                                            prompt
+                                    }
+                                ]
+                            }
+                        ],
+
+                        config: {
+                            temperature:
+                                0.15,
+
+                            maxOutputTokens:
+                                1800
+                        }
+                    }
+                );
+
+            const report =
+                response?.text ||
+                response?.candidates?.[0]
+                    ?.content?.parts
+                    ?.map(
+                        part =>
+                            part.text ||
+                            ""
+                    )
+                    .join("") ||
+                "";
+
+            if (!report.trim()) {
+                return res.status(502).json({
+                    success: false,
 
                     message:
-                        "Unsupported media type."
+                        "The AI returned an empty forensic assessment."
                 });
             }
 
-            /*
-                Remove a possible data URL prefix.
-            */
+            return res.json({
+                success:
+                    true,
 
-            const cleanData =
-                String(data)
-                    .replace(
-                        /^data:[^;]+;base64,/,
-                        ""
-                    );
+                report,
 
-            const analysisPrompt =
-                `
-You are TrueAegis AI, a digital media authenticity analysis assistant.
+                filename:
+                    filename ||
+                    null,
 
-Analyze this uploaded media for signs that may indicate:
-- AI generation
-- digital manipulation
-- editing
-- compositing
-- unusual visual artifacts
-- inconsistencies
-- suspicious metadata if available
-- other authenticity concerns
+                assessmentType:
+                    "AI-assisted media assessment",
+
+                disclaimer:
+                    "This assessment is not definitive proof of authenticity or manipulation."
+            });
+        }
+        catch (error) {
+            console.error(
+                "❌ Media analysis error:",
+                error.message
+            );
+
+            return res.status(
+                error.status ||
+                500
+            ).json({
+                success: false,
+
+                message:
+                    "Media analysis is temporarily unavailable. Please try again."
+            });
+        }
+    }
+);
+
+// ============================================================
+// CONTENT VERIFICATION
+// ============================================================
+
+app.post(
+    "/api/content-verification",
+    async (req, res) => {
+        try {
+            const {
+                content,
+                url,
+                claim
+            } = req.body;
+
+            const text =
+                content ||
+                claim ||
+                url;
+
+            if (!text) {
+                return res.status(400).json({
+                    success: false,
+
+                    message:
+                        "Please provide content, a claim, or a URL."
+                });
+            }
+
+            if (!geminiClient) {
+                return res.status(503).json({
+                    success: false,
+
+                    message:
+                        "Content verification AI is not configured."
+                });
+            }
+
+            const prompt =
+                `You are TrueAegis Content Verification AI.
+
+Assess the following content:
+
+${String(text)}
+
+Provide:
+
+ASSESSMENT:
+A concise evaluation.
+
+EVIDENCE:
+What supports or weakens the claim.
+
+LIMITATIONS:
+What cannot be established from the supplied information.
+
+VERIFICATION STEPS:
+Specific independent checks the user should perform.
 
 IMPORTANT:
-Do not claim that visual analysis alone can prove whether something is
-definitively real or fake.
+This is an AI-assisted assessment, not definitive proof.
+Do not invent sources or facts.
+If the provided content is insufficient, explicitly say so.`;
 
-Return:
-1. Overall assessment
-2. Suspicion level
-3. Evidence observed
-4. Limitations
-5. Recommended next verification steps
-
-Filename:
-${fileName || "uploaded-media"}
-`;
-
-            const result =
+            const reply =
                 await callGemini(
                     [
                         {
@@ -1482,182 +972,452 @@ ${fileName || "uploaded-media"}
                             parts: [
                                 {
                                     text:
-                                        analysisPrompt
-                                },
-
-                                {
-                                    inlineData: {
-
-                                        mimeType:
-                                            mimeType,
-
-                                        data:
-                                            cleanData
-                                    }
+                                        prompt
                                 }
                             ]
                         }
                     ],
                     {
                         temperature:
-                            0.1,
+                            0.2,
 
                         maxOutputTokens:
-                            2200
+                            1600
                     }
                 );
 
             return res.json({
-
                 success:
                     true,
 
-                analysis:
-                    result
+                reply,
+
+                disclaimer:
+                    "AI-assisted assessment — not definitive proof."
             });
         }
-
         catch (error) {
-
             console.error(
-                "MEDIA ANALYSIS ERROR:",
-                error
+                "❌ Content verification error:",
+                error.message
             );
 
-            return res.status(
-                error.status || 500
-            ).json({
-
-                success:
-                    false,
+            return res.status(500).json({
+                success: false,
 
                 message:
-                    error.message ||
-                    "Media analysis failed."
+                    "Content verification is temporarily unavailable."
             });
         }
     }
 );
 
 // ============================================================
-// PERPLEXITY AEgis CHAT
+// NEWS ANALYSIS
 // ============================================================
 
 app.post(
-    "/api/aegis-chat",
+    "/api/news-analysis",
     async (req, res) => {
-
         try {
-
             const {
-                message,
-                history = []
+                query,
+                content
             } = req.body;
 
-            if (!message) {
+            const input =
+                query ||
+                content;
 
+            if (!input) {
                 return res.status(400).json({
-
-                    success:
-                        false,
+                    success: false,
 
                     message:
-                        "Message is required."
+                        "Please provide a news topic or article."
                 });
             }
 
             const messages = [
-
                 {
                     role:
                         "system",
 
                     content:
-                        "You are Aegis, the intelligent assistant inside TrueAegis. Give clear, evidence-aware answers. Never invent facts, sources, citations, or verification results."
-                }
+                        `You are TrueAegis Signal Desk, an AI news analysis assistant.
 
+Analyze news claims carefully.
+
+Never treat an AI-generated assessment as definitive proof.
+Separate:
+- Claim
+- Evidence
+- Context
+- Uncertainty
+- Verification steps
+
+Do not invent citations or sources.`
+                },
+
+                {
+                    role:
+                        "user",
+
+                    content:
+                        String(input)
+                }
             ];
 
-            for (
-                const item
-                of history
-            ) {
+            let reply;
+            let provider =
+                "perplexity";
 
-                if (
-                    item?.role &&
-                    item?.content
-                ) {
+            try {
+                reply =
+                    await callPerplexity(
+                        messages,
+                        {
+                            model:
+                                "sonar",
 
-                    messages.push({
+                            temperature:
+                                0.15,
 
-                        role:
-                            item.role ===
-                            "assistant"
-                                ? "assistant"
-                                : "user",
+                            max_tokens:
+                                1800,
 
-                        content:
-                            String(
-                                item.content
-                            )
-                    });
-                }
+                            retries:
+                                1
+                        }
+                    );
             }
-
-            messages.push({
-
-                role:
-                    "user",
-
-                content:
-                    String(
-                        message
-                    )
-            });
-
-            const reply =
-                await callPerplexity(
-                    messages,
-                    {
-                        model:
-                            "sonar",
-
-                        temperature:
-                            0.25,
-
-                        max_tokens:
-                            1400
-                    }
+            catch (
+                perplexityError
+            ) {
+                console.warn(
+                    "⚠️ News Perplexity unavailable. " +
+                    "Trying Gemini fallback..."
                 );
 
-            return res.json({
+                if (!geminiClient) {
+                    throw perplexityError;
+                }
 
+                const geminiContents =
+                    messages.map(
+                        item => ({
+                            role:
+                                item.role ===
+                                "assistant"
+                                    ? "model"
+                                    : "user",
+
+                            parts: [
+                                {
+                                    text:
+                                        item.content
+                                }
+                            ]
+                        })
+                    );
+
+                reply =
+                    await callGemini(
+                        geminiContents,
+                        {
+                            temperature:
+                                0.15,
+
+                            maxOutputTokens:
+                                1800
+                        }
+                    );
+
+                provider =
+                    "gemini-fallback";
+            }
+
+            return res.json({
                 success:
                     true,
 
-                reply
+                reply,
+
+                provider
             });
         }
-
         catch (error) {
-
             console.error(
-                "AEGIS CHAT ERROR:",
-                error
+                "❌ News analysis error:",
+                error.message
             );
 
             return res.status(
-                error.status || 500
+                error.status ||
+                500
             ).json({
-
-                success:
-                    false,
+                success: false,
 
                 message:
-                    error.message ||
-                    "Aegis chatbot failed."
+                    "News analysis is temporarily unavailable. Please try again."
             });
         }
+    }
+);
+
+// ============================================================
+// GOOGLE LOGIN
+// ============================================================
+
+const googleClientId =
+    process.env.GOOGLE_CLIENT_ID;
+
+const googleClientSecret =
+    process.env.GOOGLE_CLIENT_SECRET;
+
+const googleRedirectUri =
+    process.env.GOOGLE_REDIRECT_URI ||
+    `${BASE_URL}/api/auth/google/callback`;
+
+let googleOAuthClient =
+    null;
+
+if (
+    googleClientId &&
+    googleClientSecret
+) {
+    googleOAuthClient =
+        new OAuth2Client(
+            googleClientId,
+            googleClientSecret,
+            googleRedirectUri
+        );
+
+    console.log(
+        "🔐 Google OAuth configured."
+    );
+}
+else {
+    console.warn(
+        "⚠️ Google Login is not configured on the server."
+    );
+}
+
+// ============================================================
+// GOOGLE AUTH START
+// ============================================================
+
+app.get(
+    "/api/auth/google",
+    (req, res) => {
+        if (!googleOAuthClient) {
+            return res.status(503).json({
+                success: false,
+
+                message:
+                    "Google Login is not configured on the server."
+            });
+        }
+
+        const authorizationUrl =
+            googleOAuthClient.generateAuthUrl(
+                {
+                    access_type:
+                        "offline",
+
+                    scope: [
+                        "openid",
+                        "email",
+                        "profile"
+                    ],
+
+                    prompt:
+                        "select_account"
+                }
+            );
+
+        res.redirect(
+            authorizationUrl
+        );
+    }
+);
+
+// ============================================================
+// GOOGLE AUTH CALLBACK
+// ============================================================
+
+app.get(
+    "/api/auth/google/callback",
+    async (req, res) => {
+        try {
+            if (!googleOAuthClient) {
+                return res.status(503).send(
+                    "Google Login is not configured on the server."
+                );
+            }
+
+            const {
+                code
+            } = req.query;
+
+            if (!code) {
+                return res.status(400).send(
+                    "Missing Google authorization code."
+                );
+            }
+
+            const {
+                tokens
+            } =
+                await googleOAuthClient.getToken(
+                    code
+                );
+
+            googleOAuthClient.setCredentials(
+                tokens
+            );
+
+            const ticket =
+                await googleOAuthClient.verifyIdToken(
+                    {
+                        idToken:
+                            tokens.id_token,
+
+                        audience:
+                            googleClientId
+                    }
+                );
+
+            const payload =
+                ticket.getPayload();
+
+            if (!payload) {
+                return res.status(401).send(
+                    "Unable to verify Google account."
+                );
+            }
+
+            const email =
+                payload.email;
+
+            const name =
+                payload.name ||
+                payload.email;
+
+            // ------------------------------------------------
+            // Find/create user through auth model if available
+            // ------------------------------------------------
+
+            try {
+                const User =
+                    mongoose.model(
+                        "User"
+                    );
+
+                let user =
+                    await User.findOne({
+                        email
+                    });
+
+                if (!user) {
+                    user =
+                        await User.create({
+                            fullName:
+                                name,
+
+                            email,
+
+                            password:
+                                crypto
+                                    .randomBytes(
+                                        32
+                                    )
+                                    .toString(
+                                        "hex"
+                                    )
+                        });
+                }
+
+                console.log(
+                    `✅ Google login: ${email}`
+                );
+            }
+            catch (
+                userError
+            ) {
+                console.warn(
+                    "⚠️ Google user database operation:",
+                    userError.message
+                );
+            }
+
+            return res.redirect(
+                "/dashboard.html"
+            );
+        }
+        catch (error) {
+            console.error(
+                "❌ Google OAuth error:",
+                error.message
+            );
+
+            return res.status(500).send(
+                "Google authentication failed. Please try again."
+            );
+        }
+    }
+);
+
+// ============================================================
+// API STATUS
+// ============================================================
+
+app.get(
+    "/api/status",
+    (req, res) => {
+        res.json({
+            success:
+                true,
+
+            platform:
+                "TrueAegis AI",
+
+            status:
+                "operational",
+
+            services: {
+                authentication:
+                    true,
+
+                mongodb:
+                    mongoose.connection
+                        .readyState ===
+                    1,
+
+                gemini:
+                    !!geminiClient,
+
+                perplexity:
+                    !!process.env
+                        .PERPLEXITY_API_KEY,
+
+                mediaAnalysis:
+                    !!geminiClient,
+
+                contentVerification:
+                    !!geminiClient,
+
+                newsAnalysis:
+                    !!(
+                        geminiClient ||
+                        process.env
+                            .PERPLEXITY_API_KEY
+                    )
+            },
+
+            timestamp:
+                new Date().toISOString()
+        });
     }
 );
 
@@ -1668,9 +1428,7 @@ app.post(
 app.use(
     "/api",
     (req, res) => {
-
         res.status(404).json({
-
             success:
                 false,
 
@@ -1681,28 +1439,33 @@ app.use(
 );
 
 // ============================================================
-// GENERAL ERROR HANDLER
+// GLOBAL ERROR HANDLER
 // ============================================================
 
 app.use(
-    (error, req, res, next) => {
-
+    (
+        error,
+        req,
+        res,
+        next
+    ) => {
         console.error(
-            "UNHANDLED SERVER ERROR:",
+            "❌ Unhandled server error:",
             error
         );
 
-        if (res.headersSent) {
-
+        if (
+            res.headersSent
+        ) {
             return next(
                 error
             );
         }
 
         res.status(
-            error.status || 500
+            error.status ||
+            500
         ).json({
-
             success:
                 false,
 
@@ -1713,61 +1476,18 @@ app.use(
 );
 
 // ============================================================
-// MONGODB CONNECTION
-// ============================================================
-
-async function connectMongoDB() {
-
-    const mongoURI =
-        process.env.MONGODB_URI;
-
-    if (!mongoURI) {
-
-        console.error(
-            "❌ MONGODB_URI is missing."
-        );
-
-        return;
-    }
-
-    try {
-
-        await mongoose.connect(
-            mongoURI,
-            {
-                serverSelectionTimeoutMS:
-                    15000
-            }
-        );
-
-        console.log(
-            "✅ MongoDB Connected"
-        );
-
-    }
-
-    catch (error) {
-
-        console.error(
-            "❌ MongoDB Connection Error:",
-            error.message
-        );
-    }
-}
-
-// ============================================================
 // START SERVER
 // ============================================================
 
 async function startServer() {
-
     await connectMongoDB();
+
+    initializeGemini();
 
     app.listen(
         PORT,
         HOST,
         () => {
-
             console.log(
                 "============================================================"
             );
@@ -1789,27 +1509,23 @@ async function startServer() {
             );
 
             console.log(
-                `🤖 Gemini mode: ${geminiMode}`
+                `🤖 Gemini Model: ${GEMINI_MODEL}`
             );
 
             console.log(
                 `🔎 Perplexity: ${
                     process.env.PERPLEXITY_API_KEY
-                        ? "enabled"
-                        : "disabled"
+                        ? "configured"
+                        : "not configured"
                 }`
             );
 
             console.log(
-                `🔐 Google Login: ${
+                `🔐 Google OAuth: ${
                     googleOAuthClient
-                        ? "enabled"
-                        : "disabled"
+                        ? "configured"
+                        : "not configured"
                 }`
-            );
-
-            console.log(
-                `🐉 Dragon: ${BASE_URL}/dragon.html`
             );
 
             console.log(
@@ -1828,12 +1544,23 @@ startServer();
 process.on(
     "SIGTERM",
     async () => {
-
         console.log(
-            "SIGTERM received. Shutting down..."
+            "🛑 SIGTERM received. Shutting down..."
         );
 
-        await mongoose.connection.close();
+        try {
+            await mongoose.connection.close();
+
+            console.log(
+                "✅ MongoDB connection closed."
+            );
+        }
+        catch (error) {
+            console.error(
+                "❌ Shutdown error:",
+                error.message
+            );
+        }
 
         process.exit(
             0
@@ -1844,12 +1571,23 @@ process.on(
 process.on(
     "SIGINT",
     async () => {
-
         console.log(
-            "SIGINT received. Shutting down..."
+            "🛑 SIGINT received. Shutting down..."
         );
 
-        await mongoose.connection.close();
+        try {
+            await mongoose.connection.close();
+
+            console.log(
+                "✅ MongoDB connection closed."
+            );
+        }
+        catch (error) {
+            console.error(
+                "❌ Shutdown error:",
+                error.message
+            );
+        }
 
         process.exit(
             0
