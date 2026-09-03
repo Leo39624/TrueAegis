@@ -2767,6 +2767,482 @@
         }
 
         /* =====================================================
+           UPGRADED MEDIA ANALYSIS RESULT UI
+        ===================================================== */
+
+        .media-tool-intro {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            margin: 0 0 18px;
+            padding: 13px 15px;
+            border: 1px solid rgba(0, 217, 255, .20);
+            border-radius: 12px;
+            background: rgba(0, 217, 255, .055);
+            color: #a9bdca;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .media-tool-intro strong {
+            color: #eaf8ff;
+        }
+
+        .media-result {
+            margin-top: 22px;
+            display: none;
+        }
+
+        .media-result.visible {
+            display: block;
+            animation: mediaResultIn .35s ease both;
+        }
+
+        @keyframes mediaResultIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .media-result-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 14px;
+        }
+
+        .media-result-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .media-result-title h3 {
+            margin: 0;
+            color: #f2fbff;
+            font-size: 19px;
+        }
+
+        .media-result-title span {
+            color: #7f9aaa;
+            font-size: 12px;
+        }
+
+        .analysis-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 10px;
+            border: 1px solid rgba(0, 255, 180, .22);
+            border-radius: 999px;
+            background: rgba(0, 255, 180, .055);
+            color: #55f2bb;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .07em;
+            text-transform: uppercase;
+        }
+
+        .analysis-status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #55f2bb;
+            box-shadow: 0 0 10px rgba(85, 242, 187, .8);
+        }
+
+        .suspicion-card {
+            position: relative;
+            overflow: hidden;
+            padding: 22px;
+            margin-bottom: 14px;
+            border: 1px solid rgba(0, 217, 255, .20);
+            border-radius: 16px;
+            background:
+                radial-gradient(circle at 90% 10%, rgba(0, 217, 255, .12), transparent 32%),
+                linear-gradient(135deg, rgba(8, 28, 42, .98), rgba(5, 16, 26, .98));
+        }
+
+        .suspicion-card::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 42%;
+            height: 2px;
+            background: linear-gradient(90deg, #00d9ff, transparent);
+        }
+
+        .suspicion-layout {
+            display: grid;
+            grid-template-columns: minmax(190px, .75fr) 1.6fr;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .suspicion-label {
+            color: #7f9aaa;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+        }
+
+        .suspicion-level {
+            margin: 6px 0 5px;
+            font-size: 31px;
+            line-height: 1;
+            font-weight: 900;
+            letter-spacing: -.03em;
+        }
+
+        .suspicion-level.low {
+            color: #55f2bb;
+        }
+
+        .suspicion-level.medium {
+            color: #ffd166;
+        }
+
+        .suspicion-level.high {
+            color: #ff7184;
+        }
+
+        .suspicion-summary {
+            color: #a9bdca;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .risk-meter {
+            height: 9px;
+            overflow: hidden;
+            border: 1px solid #214257;
+            border-radius: 999px;
+            background: #06131e;
+        }
+
+        .risk-meter-track {
+            height: 100%;
+            width: 33%;
+            border-radius: inherit;
+            background: #55f2bb;
+            transition: width .5s ease;
+        }
+
+        .risk-meter-track.medium {
+            width: 66%;
+            background: #ffd166;
+        }
+
+        .risk-meter-track.high {
+            width: 100%;
+            background: #ff7184;
+        }
+
+        .risk-meter-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 7px;
+            color: #607b8c;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+        }
+
+        .assessment-box {
+            margin-top: 16px;
+            padding: 15px;
+            border: 1px solid #1d4054;
+            border-radius: 12px;
+            background: rgba(3, 13, 21, .58);
+        }
+
+        .assessment-box h4 {
+            margin: 0 0 7px;
+            color: #00d9ff;
+            font-size: 11px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+        }
+
+        .assessment-box p {
+            margin: 0;
+            color: #d7e6ee;
+            line-height: 1.7;
+            white-space: pre-wrap;
+        }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .result-card {
+            min-width: 0;
+            padding: 19px;
+            border: 1px solid #1b3b50;
+            border-radius: 15px;
+            background: linear-gradient(145deg, rgba(7, 21, 32, .96), rgba(4, 14, 23, .96));
+        }
+
+        .result-card.full {
+            grid-column: 1 / -1;
+        }
+
+        .result-card-head {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            margin-bottom: 13px;
+        }
+
+        .result-card-icon {
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            border: 1px solid #214a60;
+            border-radius: 10px;
+            background: rgba(0, 217, 255, .06);
+            font-size: 16px;
+        }
+
+        .result-card h4 {
+            margin: 0;
+            color: #f0faff;
+            font-size: 15px;
+        }
+
+        .result-card-subtitle {
+            margin-top: 2px;
+            color: #607b8c;
+            font-size: 11px;
+        }
+
+        .result-card-body {
+            color: #a9bdca;
+            font-size: 13px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+        }
+
+        .evidence-list,
+        .verification-list {
+            display: grid;
+            gap: 9px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .evidence-item,
+        .verification-item {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 10px 11px;
+            border: 1px solid rgba(35, 70, 91, .75);
+            border-radius: 10px;
+            background: rgba(4, 14, 23, .55);
+        }
+
+        .evidence-item::before {
+            content: "•";
+            color: #00d9ff;
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .verification-item {
+            counter-increment: verify;
+        }
+
+        .verification-list {
+            counter-reset: verify;
+        }
+
+        .verification-item::before {
+            content: counter(verify);
+            flex: 0 0 24px;
+            width: 24px;
+            height: 24px;
+            display: grid;
+            place-items: center;
+            border-radius: 7px;
+            background: rgba(0, 217, 255, .10);
+            color: #00d9ff;
+            font-size: 11px;
+            font-weight: 900;
+        }
+
+        .limitations-card {
+            border-color: rgba(255, 209, 102, .18);
+        }
+
+        .limitations-card .result-card-icon {
+            border-color: rgba(255, 209, 102, .25);
+        }
+
+        .limitations-card .result-card-body {
+            color: #c9c2a9;
+        }
+
+        .ai-disclaimer {
+            display: flex;
+            gap: 11px;
+            align-items: flex-start;
+            margin-top: 14px;
+            padding: 13px 15px;
+            border: 1px solid rgba(255, 209, 102, .22);
+            border-radius: 12px;
+            background: rgba(255, 209, 102, .055);
+            color: #c9c2a9;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .ai-disclaimer strong {
+            color: #f0d98a;
+        }
+
+        .analysis-loading {
+            display: none;
+            margin-top: 18px;
+            padding: 16px;
+            border: 1px solid #1b3b50;
+            border-radius: 13px;
+            background: rgba(6, 19, 30, .92);
+        }
+
+        .analysis-loading.visible {
+            display: block;
+        }
+
+        .loading-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .loading-label {
+            color: #d7e6ee;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .loading-percent {
+            color: #00d9ff;
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .loading-bar {
+            height: 6px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: #0a1e2d;
+        }
+
+        .loading-progress {
+            width: 15%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #00d9ff, #2684ff);
+            transition: width .7s ease;
+        }
+
+        .loading-hint {
+            margin-top: 9px;
+            color: #607b8c;
+            font-size: 11px;
+        }
+
+        .media-preview {
+            display: none;
+            align-items: center;
+            gap: 12px;
+            margin: 12px 0;
+            padding: 10px;
+            border: 1px solid #1b3b50;
+            border-radius: 11px;
+            background: rgba(3, 13, 21, .55);
+        }
+
+        .media-preview.visible {
+            display: flex;
+        }
+
+        .media-preview img {
+            width: 58px;
+            height: 58px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid #214a60;
+        }
+
+        .media-preview-info {
+            min-width: 0;
+        }
+
+        .media-preview-name {
+            overflow: hidden;
+            color: #d7e6ee;
+            font-size: 12px;
+            font-weight: 700;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .media-preview-meta {
+            margin-top: 4px;
+            color: #607b8c;
+            font-size: 10px;
+        }
+
+        .analysis-error {
+            display: none;
+            margin-top: 18px;
+            padding: 14px 16px;
+            border: 1px solid rgba(255, 113, 132, .25);
+            border-radius: 12px;
+            background: rgba(255, 113, 132, .055);
+            color: #ff9aaa;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .analysis-error.visible {
+            display: block;
+        }
+
+        @media (max-width: 760px) {
+            .suspicion-layout,
+            .result-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .result-card.full {
+                grid-column: auto;
+            }
+
+            .media-result-top {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+        }
+
+        /* =====================================================
            MEDIA
         ===================================================== */
 
@@ -4945,6 +5421,15 @@
 
                     <div class="analysis-box">
 
+                        <div class="media-tool-intro">
+                            <div>🛡️</div>
+                            <div>
+                                <strong>AI-assisted authenticity assessment.</strong>
+                                TrueAegis looks for visual inconsistencies and possible manipulation indicators.
+                                Results are investigative guidance, not definitive proof of whether media is real or fake.
+                            </div>
+                        </div>
+
                         <label
                             class="file-label"
                             for="mediaInput"
@@ -4954,17 +5439,11 @@
                             JPG · PNG · WEBP
                         </label>
 
-
                         <input
                             id="mediaInput"
                             type="file"
-                            accept="
-                                image/jpeg,
-                                image/png,
-                                image/webp
-                            "
+                            accept="image/jpeg,image/png,image/webp"
                         >
-
 
                         <div
                             id="selectedFile"
@@ -4973,29 +5452,84 @@
                             No image selected.
                         </div>
 
+                        <div
+                            id="mediaPreview"
+                            class="media-preview"
+                        >
+                            <img
+                                id="mediaPreviewImage"
+                                alt="Selected media preview"
+                            >
+                            <div class="media-preview-info">
+                                <div
+                                    id="mediaPreviewName"
+                                    class="media-preview-name"
+                                >
+                                    Selected image
+                                </div>
+                                <div
+                                    id="mediaPreviewMeta"
+                                    class="media-preview-meta"
+                                >
+                                    Ready for analysis
+                                </div>
+                            </div>
+                        </div>
 
                         <button
                             id="mediaAnalyzeButton"
                             class="full-button"
-                            onclick="
-                                analyzeMedia()
-                            "
+                            onclick="analyzeMedia()"
                         >
                             Analyze Image
                         </button>
 
+                        <div
+                            id="analysisLoading"
+                            class="analysis-loading"
+                            aria-live="polite"
+                        >
+                            <div class="loading-row">
+                                <span
+                                    id="loadingLabel"
+                                    class="loading-label"
+                                >
+                                    Preparing image…
+                                </span>
+                                <span
+                                    id="loadingPercent"
+                                    class="loading-percent"
+                                >
+                                    15%
+                                </span>
+                            </div>
+
+                            <div class="loading-bar">
+                                <div
+                                    id="loadingProgress"
+                                    class="loading-progress"
+                                ></div>
+                            </div>
+
+                            <div
+                                id="loadingHint"
+                                class="loading-hint"
+                            >
+                                Optimizing the image before sending it for AI analysis.
+                            </div>
+                        </div>
+
+                        <div
+                            id="analysisError"
+                            class="analysis-error"
+                            role="alert"
+                        ></div>
 
                         <div
                             id="mediaReport"
-                            class="report"
+                            class="media-result"
+                            aria-live="polite"
                         >
-
-                            <div class="report-head">
-                                Forensic Lens
-                            </div>
-
-                            No analysis has been performed yet.
-
                         </div>
 
                     </div>
@@ -6889,6 +7423,168 @@ Clearly distinguish:
             );
 
 
+        /*
+         * Performance optimization:
+         * Large phone/camera images can take much longer to upload and
+         * process. Downscale only when necessary while keeping the
+         * original image for the user's local preview.
+         */
+        function prepareMediaForAnalysis(file) {
+
+            const MAX_DIMENSION = 1600;
+            const JPEG_QUALITY = 0.82;
+
+            return new Promise(
+                (resolve, reject) => {
+
+                    const image =
+                        new Image();
+
+                    const objectUrl =
+                        URL.createObjectURL(
+                            file
+                        );
+
+                    image.onload =
+                        () => {
+
+                            URL.revokeObjectURL(
+                                objectUrl
+                            );
+
+                            const largest =
+                                Math.max(
+                                    image.naturalWidth,
+                                    image.naturalHeight
+                                );
+
+                            if (
+                                largest <=
+                                MAX_DIMENSION
+                            ) {
+
+                                resolve({
+                                    data:
+                                        fileToBase64(
+                                            file
+                                        ),
+                                    mimeType:
+                                        file.type
+                                });
+
+                                return;
+                            }
+
+                            const scale =
+                                MAX_DIMENSION /
+                                largest;
+
+                            const canvas =
+                                document.createElement(
+                                    "canvas"
+                                );
+
+                            canvas.width =
+                                Math.round(
+                                    image.naturalWidth *
+                                    scale
+                                );
+
+                            canvas.height =
+                                Math.round(
+                                    image.naturalHeight *
+                                    scale
+                                );
+
+                            const context =
+                                canvas.getContext(
+                                    "2d",
+                                    {
+                                        alpha:
+                                            false
+                                    }
+                                );
+
+                            context.drawImage(
+                                image,
+                                0,
+                                0,
+                                canvas.width,
+                                canvas.height
+                            );
+
+                            canvas.toBlob(
+                                async (
+                                    blob
+                                ) => {
+
+                                    if (
+                                        !blob
+                                    ) {
+
+                                        reject(
+                                            new Error(
+                                                "The image could not be optimized."
+                                            )
+                                        );
+
+                                        return;
+                                    }
+
+                                    try {
+
+                                        resolve({
+                                            data:
+                                                await fileToBase64(
+                                                    blob
+                                                ),
+                                            mimeType:
+                                                "image/jpeg"
+                                        });
+
+                                    }
+
+                                    catch (
+                                        error
+                                    ) {
+
+                                        reject(
+                                            error
+                                        );
+
+                                    }
+
+                                },
+                                "image/jpeg",
+                                JPEG_QUALITY
+                            );
+
+                        };
+
+                    image.onerror =
+                        () => {
+
+                            URL.revokeObjectURL(
+                                objectUrl
+                            );
+
+                            reject(
+                                new Error(
+                                    "The selected image could not be read."
+                                )
+                            );
+
+                        };
+
+                    image.src =
+                        objectUrl;
+
+                }
+            );
+
+        }
+
+
         function fileToBase64(
             file
         ) {
@@ -6902,7 +7598,6 @@ Clearly distinguish:
                     const reader =
                         new FileReader();
 
-
                     reader.onload =
                         () => {
 
@@ -6911,12 +7606,10 @@ Clearly distinguish:
                                     reader.result
                                 );
 
-
                             const comma =
                                 result.indexOf(
                                     ","
                                 );
-
 
                             resolve(
                                 comma >= 0
@@ -6928,10 +7621,8 @@ Clearly distinguish:
 
                         };
 
-
                     reader.onerror =
                         reject;
-
 
                     reader.readAsDataURL(
                         file
@@ -6939,6 +7630,719 @@ Clearly distinguish:
 
                 }
             );
+
+        }
+
+
+        function splitAnalysisSections(
+            text
+        ) {
+
+            const source =
+                String(
+                    text ||
+                    ""
+                )
+                .replace(
+                    /\r/g,
+                    ""
+                )
+                .trim();
+
+            const sections = {
+                assessment: "",
+                suspicion: "",
+                evidence: "",
+                limitations: "",
+                verification: ""
+            };
+
+            const patterns = [
+                {
+                    key:
+                        "assessment",
+                    regex:
+                        /(?:^|\n)\s*(?:#{1,4}\s*)?(?:1[\).\:\-]\s*)?(?:overall\s+assessment|assessment)\s*:?\s*/i
+                },
+                {
+                    key:
+                        "suspicion",
+                    regex:
+                        /(?:^|\n)\s*(?:#{1,4}\s*)?(?:2[\).\:\-]\s*)?(?:suspicion\s+level|risk\s+level)\s*:?\s*/i
+                },
+                {
+                    key:
+                        "evidence",
+                    regex:
+                        /(?:^|\n)\s*(?:#{1,4}\s*)?(?:3[\).\:\-]\s*)?(?:evidence\s+observed|evidence|indicators?)\s*:?\s*/i
+                },
+                {
+                    key:
+                        "limitations",
+                    regex:
+                        /(?:^|\n)\s*(?:#{1,4}\s*)?(?:4[\).\:\-]\s*)?(?:limitations?|caveats?)\s*:?\s*/i
+                },
+                {
+                    key:
+                        "verification",
+                    regex:
+                        /(?:^|\n)\s*(?:#{1,4}\s*)?(?:5[\).\:\-]\s*)?(?:recommended\s+next\s+verification\s+steps?|verification\s+steps?|recommended\s+steps?)\s*:?\s*/i
+                }
+            ];
+
+            const matches = [];
+
+            patterns.forEach(
+                item => {
+
+                    const match =
+                        item.regex.exec(
+                            source
+                        );
+
+                    if (
+                        match
+                    ) {
+
+                        matches.push({
+                            key:
+                                item.key,
+                            start:
+                                match.index,
+                            contentStart:
+                                match.index +
+                                match[0].length
+                        });
+
+                    }
+
+                }
+            );
+
+            matches.sort(
+                (
+                    a,
+                    b
+                ) =>
+                    a.contentStart -
+                    b.contentStart
+            );
+
+            if (
+                matches.length ===
+                0
+            ) {
+
+                sections.assessment =
+                    source;
+
+                return sections;
+
+            }
+
+            matches.forEach(
+                (
+                    item,
+                    index
+                ) => {
+
+                    const next =
+                        matches[
+                            index + 1
+                        ];
+
+                    const end =
+                        next
+                            ? next.start
+                            : source.length;
+
+                    sections[
+                        item.key
+                    ] =
+                        source
+                            .slice(
+                                item.contentStart,
+                                end
+                            )
+                            .trim();
+
+                }
+            );
+
+            /*
+             * If the model omitted one heading, keep useful text visible
+             * rather than losing it.
+             */
+            const leftovers =
+                source
+                    .replace(
+                        /(?:^|\n)\s*(?:#{1,4}\s*)?(?:[1-5][\).\:\-]\s*)?(?:overall\s+assessment|assessment|suspicion\s+level|risk\s+level|evidence\s+observed|evidence|indicators?|limitations?|caveats?|recommended\s+next\s+verification\s+steps?|verification\s+steps?|recommended\s+steps?)\s*:?\s*/gi,
+                        "\n"
+                    )
+                    .trim();
+
+            if (
+                !sections.assessment
+            ) {
+
+                sections.assessment =
+                    leftovers ||
+                    "No separate overall assessment was returned.";
+
+            }
+
+            return sections;
+
+        }
+
+
+        function cleanListText(
+            text
+        ) {
+
+            const value =
+                String(
+                    text ||
+                    ""
+                )
+                .replace(
+                    /```[\s\S]*?```/g,
+                    ""
+                )
+                .trim();
+
+            if (
+                !value
+            ) {
+
+                return [];
+
+            }
+
+            const items =
+                value
+                    .split(
+                        /\n+/
+                    )
+                    .map(
+                        line =>
+                            line
+                                .replace(
+                                    /^\s*(?:[-*•]|\d+[\).\:\-])\s*/,
+                                    ""
+                                )
+                                .trim()
+                    )
+                    .filter(
+                        Boolean
+                    );
+
+            return items.length
+                ? items
+                : [value];
+
+        }
+
+
+        function escapeHtml(
+            value
+        ) {
+
+            return String(
+                value ??
+                ""
+            )
+                .replace(
+                    /&/g,
+                    "&amp;"
+                )
+                .replace(
+                    /</g,
+                    "&lt;"
+                )
+                .replace(
+                    />/g,
+                    "&gt;"
+                )
+                .replace(
+                    /"/g,
+                    "&quot;"
+                )
+                .replace(
+                    /'/g,
+                    "&#039;"
+                );
+
+        }
+
+
+        function detectSuspicionLevel(
+            text
+        ) {
+
+            const value =
+                String(
+                    text ||
+                    ""
+                );
+
+            const high =
+                /\b(high|strong|elevated)\b/i
+                    .test(
+                        value
+                    );
+
+            const medium =
+                /\b(medium|moderate)\b/i
+                    .test(
+                        value
+                    );
+
+            if (
+                high
+            ) {
+
+                return "High";
+
+            }
+
+            if (
+                medium
+            ) {
+
+                return "Medium";
+
+            }
+
+            return "Low";
+
+        }
+
+
+        function renderAnalysisCard(
+            title,
+            subtitle,
+            icon,
+            body,
+            className = "",
+            full = false
+        ) {
+
+            return `
+                <article class="result-card ${className} ${full ? "full" : ""}">
+                    <div class="result-card-head">
+                        <div class="result-card-icon">${icon}</div>
+                        <div>
+                            <h4>${escapeHtml(title)}</h4>
+                            <div class="result-card-subtitle">
+                                ${escapeHtml(subtitle)}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="result-card-body">
+                        ${body}
+                    </div>
+                </article>
+            `;
+
+        }
+
+
+        function renderMediaAnalysis(
+            analysis,
+            file
+        ) {
+
+            const sections =
+                splitAnalysisSections(
+                    analysis
+                );
+
+            const level =
+                detectSuspicionLevel(
+                    sections.suspicion
+                );
+
+            const levelClass =
+                level.toLowerCase();
+
+            const evidence =
+                cleanListText(
+                    sections.evidence
+                );
+
+            const verification =
+                cleanListText(
+                    sections.verification
+                );
+
+            const limitations =
+                sections.limitations ||
+                "Visual AI analysis has inherent limits. It may miss subtle edits, may be affected by image quality or compression, and cannot by itself establish the true origin or authenticity of an image.";
+
+            const evidenceHtml =
+                evidence.length
+                    ? `
+                        <ul class="evidence-list">
+                            ${evidence
+                                .map(
+                                    item =>
+                                        `<li class="evidence-item">${escapeHtml(item)}</li>`
+                                )
+                                .join("")}
+                        </ul>
+                    `
+                    : `
+                        <div class="result-card-body">
+                            No distinct evidence items were separated from the AI response.
+                        </div>
+                    `;
+
+            const verificationHtml =
+                verification.length
+                    ? `
+                        <ol class="verification-list">
+                            ${verification
+                                .map(
+                                    item =>
+                                        `<li class="verification-item">${escapeHtml(item)}</li>`
+                                )
+                                .join("")}
+                        </ol>
+                    `
+                    : `
+                        <div class="result-card-body">
+                            No separate verification steps were returned. Independently verify important findings before relying on them.
+                        </div>
+                    `;
+
+            const assessment =
+                sections.assessment ||
+                "The AI returned an analysis without a separately labeled overall assessment.";
+
+            const suspicion =
+                sections.suspicion ||
+                `The model did not provide a separate suspicion explanation. The displayed ${level.toLowerCase()} level is inferred from the returned analysis and should be treated as an investigative indicator, not a definitive verdict.`;
+
+            const report =
+                document.getElementById(
+                    "mediaReport"
+                );
+
+            report.innerHTML = `
+                <div class="media-result-top">
+                    <div class="media-result-title">
+                        <div>
+                            <h3>Forensic Lens Report</h3>
+                            <span>${escapeHtml(file.name)} · AI-assisted media assessment</span>
+                        </div>
+                    </div>
+
+                    <div class="analysis-status">
+                        <span class="analysis-status-dot"></span>
+                        Analysis complete
+                    </div>
+                </div>
+
+                <section class="suspicion-card">
+                    <div class="suspicion-layout">
+                        <div>
+                            <div class="suspicion-label">
+                                Suspicion Level
+                            </div>
+
+                            <div class="suspicion-level ${levelClass}">
+                                ${escapeHtml(level)}
+                            </div>
+
+                            <div class="suspicion-summary">
+                                ${escapeHtml(suspicion)}
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="risk-meter">
+                                <div class="risk-meter-track ${levelClass}"></div>
+                            </div>
+
+                            <div class="risk-meter-labels">
+                                <span>Low</span>
+                                <span>Medium</span>
+                                <span>High</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="assessment-box">
+                        <h4>Overall Assessment</h4>
+                        <p>${escapeHtml(assessment)}</p>
+                    </div>
+                </section>
+
+                <div class="result-grid">
+
+                    ${renderAnalysisCard(
+                        "Evidence Observed",
+                        "Signals identified by the AI",
+                        "🔎",
+                        evidenceHtml,
+                        "",
+                        true
+                    )}
+
+                    ${renderAnalysisCard(
+                        "Limitations",
+                        "What this analysis cannot establish",
+                        "⚠️",
+                        `<div class="result-card-body">${escapeHtml(limitations)}</div>`,
+                        "limitations-card",
+                        false
+                    )}
+
+                    ${renderAnalysisCard(
+                        "Verification Steps",
+                        "Recommended independent checks",
+                        "✓",
+                        verificationHtml,
+                        "",
+                        false
+                    )}
+
+                    ${renderAnalysisCard(
+                        "Assessment Context",
+                        "How to interpret this result",
+                        "🛡️",
+                        `<div class="result-card-body">Use this report as an investigative aid. A suspicious or low-suspicion result does not by itself prove authenticity or manipulation. Important conclusions should be checked using independent evidence, original sources, provenance, or other appropriate verification methods.</div>`,
+                        "",
+                        false
+                    )}
+
+                </div>
+
+                <div class="ai-disclaimer">
+                    <div>⚠️</div>
+                    <div>
+                        <strong>AI assessment — not definitive proof.</strong>
+                        TrueAegis identifies possible indicators from the submitted media.
+                        It does not establish with certainty that an image is authentic, manipulated, or AI-generated.
+                    </div>
+                </div>
+            `;
+
+            report.classList.add(
+                "visible"
+            );
+
+        }
+
+
+        function setAnalysisLoading(
+            percent,
+            label,
+            hint
+        ) {
+
+            const loading =
+                document.getElementById(
+                    "analysisLoading"
+                );
+
+            const progress =
+                document.getElementById(
+                    "loadingProgress"
+                );
+
+            const percentNode =
+                document.getElementById(
+                    "loadingPercent"
+                );
+
+            const labelNode =
+                document.getElementById(
+                    "loadingLabel"
+                );
+
+            const hintNode =
+                document.getElementById(
+                    "loadingHint"
+                );
+
+            loading.classList.add(
+                "visible"
+            );
+
+            progress.style.width =
+                `${percent}%`;
+
+            percentNode.textContent =
+                `${percent}%`;
+
+            labelNode.textContent =
+                label;
+
+            hintNode.textContent =
+                hint;
+
+        }
+
+
+        function showMediaError(
+            message
+        ) {
+
+            const errorBox =
+                document.getElementById(
+                    "analysisError"
+                );
+
+            errorBox.textContent =
+                message;
+
+            errorBox.classList.add(
+                "visible"
+            );
+
+        }
+
+
+        function hideMediaError() {
+
+            document
+                .getElementById(
+                    "analysisError"
+                )
+                .classList.remove(
+                    "visible"
+                );
+
+        }
+
+
+        document
+            .getElementById(
+                "mediaInput"
+            )
+            .addEventListener(
+                "change",
+                function () {
+
+                    const file =
+                        this.files[0];
+
+                    const selected =
+                        document.getElementById(
+                            "selectedFile"
+                        );
+
+                    const preview =
+                        document.getElementById(
+                            "mediaPreview"
+                        );
+
+                    const previewImage =
+                        document.getElementById(
+                            "mediaPreviewImage"
+                        );
+
+                    const previewName =
+                        document.getElementById(
+                            "mediaPreviewName"
+                        );
+
+                    const previewMeta =
+                        document.getElementById(
+                            "mediaPreviewMeta"
+                        );
+
+                    if (
+                        !file
+                    ) {
+
+                        selected.textContent =
+                            "No image selected.";
+
+                        preview.classList.remove(
+                            "visible"
+                        );
+
+                        return;
+
+                    }
+
+                    selected.textContent =
+                        `Selected: ${file.name}`;
+
+                    previewName.textContent =
+                        file.name;
+
+                    previewMeta.textContent =
+                        `${file.type || "image"} · ${formatBytes(file.size)} · Ready for analysis`;
+
+                    previewImage.src =
+                        URL.createObjectURL(
+                            file
+                        );
+
+                    preview.classList.add(
+                        "visible"
+                    );
+
+                    hideMediaError();
+
+                    document
+                        .getElementById(
+                            "mediaReport"
+                        )
+                        .classList.remove(
+                            "visible"
+                        );
+
+                }
+            );
+
+
+        function formatBytes(
+            bytes
+        ) {
+
+            if (
+                !bytes
+            ) {
+
+                return "0 B";
+
+            }
+
+            const units = [
+                "B",
+                "KB",
+                "MB",
+                "GB"
+            ];
+
+            const index =
+                Math.min(
+                    Math.floor(
+                        Math.log(bytes) /
+                        Math.log(1024)
+                    ),
+                    units.length - 1
+                );
+
+            return (
+                bytes /
+                Math.pow(
+                    1024,
+                    index
+                )
+            )
+                .toFixed(
+                    index === 0
+                        ? 0
+                        : 1
+                ) +
+                " " +
+                units[index];
 
         }
 
@@ -6952,82 +8356,185 @@ Clearly distinguish:
                     )
                     .files[0];
 
-
             const report =
-                document
-                    .getElementById(
-                        "mediaReport"
-                    );
-
+                document.getElementById(
+                    "mediaReport"
+                );
 
             const button =
-                document
-                    .getElementById(
-                        "mediaAnalyzeButton"
-                    );
-
+                document.getElementById(
+                    "mediaAnalyzeButton"
+                );
 
             if (
                 !file
             ) {
 
-                report.textContent =
-                    "Please choose an image first.";
+                showMediaError(
+                    "Please choose an image first."
+                );
 
                 return;
 
             }
 
+            if (
+                ![
+                    "image/jpeg",
+                    "image/png",
+                    "image/webp"
+                ].includes(
+                    file.type
+                )
+            ) {
+
+                showMediaError(
+                    "Please select a JPG, PNG, or WEBP image."
+                );
+
+                return;
+
+            }
+
+            hideMediaError();
+
+            report.classList.remove(
+                "visible"
+            );
 
             button.disabled =
                 true;
 
-
             button.textContent =
-                "Analyzing...";
+                "Analyzing…";
 
-
-            report.textContent =
-                "Forensic Lens is examining the image...";
-
+            setAnalysisLoading(
+                15,
+                "Preparing image…",
+                "Optimizing the image before sending it for AI analysis."
+            );
 
             try {
 
-                const base64 =
-                    await fileToBase64(
+                /*
+                 * Smaller images are much faster to transfer and process.
+                 * The original file is never modified on the user's device.
+                 */
+                const optimized =
+                    await prepareMediaForAnalysis(
                         file
                     );
 
+                setAnalysisLoading(
+                    38,
+                    "Sending to Forensic Lens…",
+                    "Securely submitting the optimized image for visual analysis."
+                );
 
-                const result =
-                    await apiRequest(
+                const resultPromise =
+                    apiRequest(
                         "/api/media-analysis",
                         {
-
                             mimeType:
-                                file.type,
+                                optimized.mimeType,
 
                             data:
-                                base64
+                                await optimized.data,
 
+                            fileName:
+                                file.name
                         }
                     );
 
+                setAnalysisLoading(
+                    58,
+                    "AI examination in progress…",
+                    "Checking for visual inconsistencies and possible manipulation indicators."
+                );
 
-                report.textContent =
+                /*
+                 * Give the user a clear live status while the server is
+                 * doing the slower AI portion of the request.
+                 */
+                let progress =
+                    58;
+
+                const progressTimer =
+                    setInterval(
+                        () => {
+
+                            progress =
+                                Math.min(
+                                    progress + 4,
+                                    88
+                                );
+
+                            setAnalysisLoading(
+                                progress,
+                                "AI examination in progress…",
+                                "Forensic Lens is evaluating the submitted media."
+                            );
+
+                        },
+                        900
+                    );
+
+                const result =
+                    await resultPromise;
+
+                clearInterval(
+                    progressTimer
+                );
+
+                setAnalysisLoading(
+                    94,
+                    "Building forensic report…",
+                    "Structuring the AI response into evidence, limitations, and verification guidance."
+                );
+
+                await new Promise(
+                    resolve =>
+                        setTimeout(
+                            resolve,
+                            180
+                        )
+                );
+
+                renderMediaAnalysis(
                     result.analysis ||
-                    "No analysis was returned.";
+                    "No analysis was returned.",
+                    file
+                );
 
+                setAnalysisLoading(
+                    100,
+                    "Analysis complete",
+                    "Review the report below and independently verify important findings."
+                );
 
                 incrementStat(
                     "deepfake"
                 );
 
-
                 addActivity(
                     "🛡️",
                     "Media Analysis",
                     file.name
+                );
+
+                setTimeout(
+                    () => {
+
+                        document
+                            .getElementById(
+                                "analysisLoading"
+                            )
+                            .classList.remove(
+                                "visible"
+                            );
+
+                    },
+                    450
                 );
 
             }
@@ -7036,9 +8543,31 @@ Clearly distinguish:
                 error
             ) {
 
-                report.textContent =
+                showMediaError(
                     error.message ||
-                    "Media analysis failed.";
+                    "Media analysis failed. Please try again."
+                );
+
+                setAnalysisLoading(
+                    0,
+                    "Analysis stopped",
+                    "Check the message above and try again."
+                );
+
+                setTimeout(
+                    () => {
+
+                        document
+                            .getElementById(
+                                "analysisLoading"
+                            )
+                            .classList.remove(
+                                "visible"
+                            );
+
+                    },
+                    900
+                );
 
             }
 
@@ -7046,7 +8575,6 @@ Clearly distinguish:
 
                 button.disabled =
                     false;
-
 
                 button.textContent =
                     "Analyze Image";
