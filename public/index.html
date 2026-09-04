@@ -3913,6 +3913,12 @@
 /* =====================================================
    TRUEAEGIS — PERSISTENT DRAGON ENVIRONMENT
    ===================================================== */
+#dashboardPage {
+    position: relative;
+    min-height: 100vh;
+    isolation: isolate;
+}
+
 #dashboardPage .dragon-bg-layer {
     position: absolute;
     inset: 0;
@@ -3942,6 +3948,8 @@
 #dashboardPage .dashboard {
     position: relative;
     z-index: 1;
+    min-height: 100vh;
+    background: transparent;
 }
 
 #dashboardPage .sidebar,
@@ -7086,6 +7094,7 @@ Clearly distinguish:
         function openDragonExperience(clickedButton = null) {
             showDashboard();
             if (typeof trueAegisDragon !== "undefined" && trueAegisDragon) {
+                trueAegisDragon.resize();
                 trueAegisDragon.setState("guardian");
             }
             document.querySelectorAll(".sidebar-button").forEach(btn => btn.classList.remove("active"));
@@ -7313,6 +7322,15 @@ Clearly distinguish:
 
             loadDashboardUser();
 
+            // The dashboard starts hidden, so the dragon canvas may have
+            // measured as 0x0 during initial page load. Resize it again
+            // after the dashboard becomes visible.
+            requestAnimationFrame(() => {
+                if (window.trueAegisDragon) {
+                    window.trueAegisDragon.resize();
+                    window.trueAegisDragon.setState("idle");
+                }
+            });
 
             window.scrollTo(
                 0,
@@ -9726,7 +9744,7 @@ Clearly distinguish:
                 observer.observe(mediaReport,{childList:true,subtree:true,characterData:true});
             }
 
-            return { setState, reset, fire:()=>fire=1 };
+            return { setState, reset, resize, fire:()=>fire=1 };
         })();
 
         window.trueAegisDragon = trueAegisDragon;
