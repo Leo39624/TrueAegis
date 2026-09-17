@@ -3999,6 +3999,107 @@
     #dragonCanvas { opacity: .32; }
 }
 
+        /* =====================================================
+           USABILITY REFINEMENTS
+        ===================================================== */
+
+        ::selection {
+            background: rgba(0, 217, 255, .28);
+            color: #ffffff;
+        }
+
+        :focus-visible {
+            outline: 3px solid rgba(0, 217, 255, .9);
+            outline-offset: 3px;
+        }
+
+        .btn,
+        .sidebar-button,
+        .quick-card,
+        .card {
+            transition:
+                transform .2s ease,
+                box-shadow .2s ease,
+                border-color .2s ease,
+                background-color .2s ease;
+        }
+
+        .btn:hover:not(:disabled),
+        .sidebar-button:hover,
+        .quick-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:active:not(:disabled),
+        .sidebar-button:active,
+        .quick-card:active {
+            transform: translateY(0);
+        }
+
+        .chat-message {
+            box-shadow: 0 8px 20px rgba(0, 0, 0, .12);
+        }
+
+        #analysisError.visible {
+            animation: trueAegisErrorIn .22s ease-out;
+        }
+
+        @keyframes trueAegisErrorIn {
+            from { opacity: 0; transform: translateY(-6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+                scroll-behavior: auto !important;
+                transition-duration: .01ms !important;
+            }
+        }
+
+        /* Account deletion requires an explicit, deliberate action. */
+        .account-delete-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 1000000;
+            display: grid;
+            place-items: center;
+            padding: 20px;
+            background: rgba(0, 6, 12, .78);
+            backdrop-filter: blur(8px);
+        }
+
+        .account-delete-card {
+            width: min(470px, 100%);
+            padding: 28px;
+            border: 1px solid rgba(255, 97, 97, .5);
+            border-radius: 18px;
+            background: linear-gradient(145deg, #15202a, #090f16);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, .5);
+        }
+
+        .account-delete-card h2 { margin-bottom: 10px; color: #ff8f8f; }
+        .account-delete-card p { color: #b8c6d0; line-height: 1.55; }
+        .account-delete-card label { display: block; margin-top: 16px; color: #dcecf7; font-size: 14px; }
+        .account-delete-card input {
+            width: 100%;
+            margin-top: 7px;
+            padding: 12px;
+            border: 1px solid #405568;
+            border-radius: 9px;
+            color: #f4faff;
+            background: #07121c;
+        }
+        .account-delete-card input[readonly] { color: #91a5b5; }
+        .account-delete-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+        .delete-account-button { color: #ffaaaa !important; }
+        .delete-account-button:hover { background: rgba(180, 45, 45, .18) !important; }
+        .delete-account-confirm { background: #b52d3b !important; border-color: #df6170 !important; }
+        .delete-account-confirm:hover:not(:disabled) { background: #d03848 !important; }
+        .delete-account-message { min-height: 20px; margin-top: 14px; color: #ffabab !important; font-size: 13px; }
     </style>
 
 </head>
@@ -5172,6 +5273,14 @@
                     🚪 Logout
                 </button>
 
+                <button
+                    class="sidebar-button delete-account-button"
+                    type="button"
+                    onclick="openDeleteAccountDialog()"
+                >
+                    🗑️ Delete Account
+                </button>
+
             </aside>
 
 
@@ -5884,6 +5993,35 @@ that you want investigated...
         © 2026 TrueAegis — Digital Trust Intelligence
     </footer>
 
+
+    <div
+        id="deleteAccountModal"
+        class="account-delete-modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="deleteAccountTitle"
+    >
+        <div class="account-delete-card">
+            <h2 id="deleteAccountTitle">Delete your account?</h2>
+            <p>This permanently removes your TrueAegis account. This action cannot be undone.</p>
+
+            <label for="deleteAccountEmail">Account</label>
+            <input id="deleteAccountEmail" type="email" readonly>
+
+            <label for="deleteAccountPassword">Confirm your password</label>
+            <input id="deleteAccountPassword" type="password" autocomplete="current-password" placeholder="Enter your password">
+
+            <label for="deleteAccountConfirmation">Type <strong>DELETE</strong> to confirm</label>
+            <input id="deleteAccountConfirmation" type="text" autocomplete="off" placeholder="DELETE">
+
+            <p id="deleteAccountMessage" class="delete-account-message" role="alert"></p>
+
+            <div class="account-delete-actions">
+                <button class="btn" type="button" onclick="closeDeleteAccountDialog()">Cancel</button>
+                <button id="deleteAccountButton" class="btn delete-account-confirm" type="button" onclick="deleteCurrentAccount()">Delete account</button>
+            </div>
+        </div>
+    </div>
 
     <script>
 
@@ -7461,6 +7599,92 @@ Clearly distinguish:
 
 
         /* =====================================================
+           ACCOUNT DELETION
+        ===================================================== */
+
+        function getSignedInUser() {
+            try {
+                return JSON.parse(localStorage.getItem("trueAegisUser") || "null");
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function openDeleteAccountDialog() {
+            const user = getSignedInUser();
+            const email = String(user?.email || "").trim();
+            const message = document.getElementById("deleteAccountMessage");
+
+            if (!email) {
+                alert("Please log in again before deleting your account.");
+                return;
+            }
+
+            document.getElementById("deleteAccountEmail").value = email;
+            document.getElementById("deleteAccountPassword").value = "";
+            document.getElementById("deleteAccountConfirmation").value = "";
+            message.textContent = "";
+            document.getElementById("deleteAccountModal").classList.remove("hidden");
+            document.getElementById("deleteAccountPassword").focus();
+        }
+
+        function closeDeleteAccountDialog() {
+            document.getElementById("deleteAccountModal").classList.add("hidden");
+        }
+
+        async function deleteCurrentAccount() {
+            const user = getSignedInUser();
+            const email = String(user?.email || "").trim();
+            const password = document.getElementById("deleteAccountPassword").value;
+            const confirmation = document.getElementById("deleteAccountConfirmation").value.trim();
+            const message = document.getElementById("deleteAccountMessage");
+            const button = document.getElementById("deleteAccountButton");
+
+            if (!email) {
+                message.textContent = "Your sign-in details are unavailable. Please log in again.";
+                return;
+            }
+
+            if (confirmation !== "DELETE") {
+                message.textContent = 'Type DELETE exactly to confirm account deletion.';
+                return;
+            }
+
+            if (!password) {
+                message.textContent = "Enter your password to continue.";
+                return;
+            }
+
+            button.disabled = true;
+            button.textContent = "Deleting…";
+            message.textContent = "";
+
+            try {
+                const response = await fetch("/api/auth/account", {
+                    method: "DELETE",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, password })
+                });
+                const result = await response.json().catch(() => ({}));
+
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || "Your account could not be deleted.");
+                }
+
+                localStorage.removeItem("trueAegisUser");
+                localStorage.removeItem("trueAegisRememberEmail");
+                closeDeleteAccountDialog();
+                alert("Your TrueAegis account has been deleted.");
+                showHome();
+            } catch (error) {
+                message.textContent = error.message || "Your account could not be deleted.";
+            } finally {
+                button.disabled = false;
+                button.textContent = "Delete account";
+            }
+        }
+
+        /* =====================================================
            LOGOUT
         ===================================================== */
 
@@ -8552,10 +8776,10 @@ Clearly distinguish:
                             mimeType:
                                 optimized.mimeType,
 
-                            data:
+                            image:
                                 await optimized.data,
 
-                            fileName:
+                            filename:
                                 file.name
                         }
                     );
@@ -8615,7 +8839,7 @@ Clearly distinguish:
                 );
 
                 renderMediaAnalysis(
-                    result.analysis ||
+                    result.report ||
                     "No analysis was returned.",
                     file
                 );
@@ -8756,10 +8980,10 @@ Clearly distinguish:
 
                 const result =
                     await apiRequest(
-                        "/api/content-analysis",
+                        "/api/content-verification",
                         {
 
-                            text:
+                            claim:
                                 input +
 
                                 "\n\n" +
@@ -8773,7 +8997,7 @@ Clearly distinguish:
 
 
                 report.textContent =
-                    result.analysis ||
+                    result.reply ||
                     "No analysis was returned.";
 
 
@@ -8878,7 +9102,7 @@ Clearly distinguish:
                         "/api/news-analysis",
                         {
 
-                            text:
+                            query:
                                 input +
 
                                 "\n\n" +
@@ -8892,7 +9116,7 @@ Clearly distinguish:
 
 
                 report.textContent =
-                    result.analysis ||
+                    result.reply ||
                     "No analysis was returned.";
 
 
@@ -9047,7 +9271,7 @@ Clearly distinguish:
 
                 const result =
                     await apiRequest(
-                        "/api/chat",
+                        "/api/ai-chat",
                         {
 
                             message:

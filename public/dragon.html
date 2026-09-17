@@ -114,17 +114,59 @@
 
     .mobile-controls button:active { transform: scale(0.96); }
 
+    .mobile-controls button:focus-visible {
+      outline: 3px solid rgba(255, 255, 255, 0.85);
+      outline-offset: 3px;
+    }
+
+    .status {
+      position: fixed; right: 18px; top: 18px; z-index: 5;
+      max-width: min(280px, calc(100vw - 36px));
+      padding: 8px 11px;
+      border: 1px solid rgba(0, 217, 255, 0.2);
+      border-radius: 999px;
+      color: #bcefff;
+      background: rgba(3, 14, 24, 0.62);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, .22);
+      font-size: 11px; font-weight: 750; letter-spacing: .045em;
+      text-align: center;
+      backdrop-filter: blur(12px);
+      pointer-events: none;
+      opacity: 0; transform: translateY(-8px);
+      transition: opacity .22s ease, transform .22s ease;
+    }
+
+    .status.visible { opacity: 1; transform: translateY(0); }
+
     @media (hover: none), (pointer: coarse) {
       body { cursor: default; }
       .cursor { display: none; }
       .mobile-controls { display: flex; }
       .hint { display: none; }
       .hud { top: 12px; left: 12px; width: min(340px, calc(100vw - 24px)); }
+      .status { top: 12px; right: 12px; }
+    }
+
+    @media (max-width: 480px) {
+      .hud { padding: 13px 14px; }
+      .hud p { font-size: 12px; }
+      .keys { gap: 4px; margin-top: 9px; }
+      .key { padding: 3px 6px; font-size: 10px; }
+      .mobile-controls {
+        bottom: max(14px, env(safe-area-inset-bottom));
+        width: calc(100vw - 24px);
+        justify-content: center;
+      }
+      .mobile-controls button { flex: 1; padding: 11px 8px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hud, .status, .mobile-controls button { transition: none; }
     }
   </style>
 </head>
 <body>
-  <canvas id="c"></canvas>
+  <canvas id="c" aria-label="Interactive animated TrueAegis dragon"></canvas>
 
   <div class="hud" id="hud">
     <h1>TrueAegis <span>Dragon Lab</span></h1>
@@ -140,9 +182,10 @@
   </div>
 
   <div class="hint">Move to fly · Click to breathe fire</div>
+  <div class="status" id="status" role="status" aria-live="polite"></div>
   <div class="cursor" id="cursor"></div>
 
-  <div class="mobile-controls">
+  <div class="mobile-controls" aria-label="Dragon controls">
     <button type="button" id="btnFire">🔥 Fire</button>
     <button type="button" id="btnColor">🎨 Color</button>
     <button type="button" id="btnHelp">? Help</button>
@@ -153,11 +196,15 @@
     const ctx = canvas.getContext("2d");
     const cursorEl = document.getElementById("cursor");
     const hud = document.getElementById("hud");
+    const statusEl = document.getElementById("status");
 
     let W = 0, H = 0, dpr = 1;
     let last = performance.now();
     let time = 0, wingT = 0, fireEnergy = 0;
     let paused = false, helpOn = true;
+    let pageVisible = true;
+    let statusTimer = null;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const mouse = { x: 0, y: 0, px: 0, py: 0, speed: 0 };
 
@@ -186,7 +233,7 @@
         glow: "rgba(80, 190, 255, 0.55)",
         fire: ["#f6ffff", "#96f7ff", "#4a9cff", "#5d55ff", "#9a2aff"]
       },
-      {
+            {
         name: "Obsidian",
         body: "#2c2a3c", bodyLight: "#5a5a7a", belly: "#a8a4b4", bellyDark: "#585468",
         wing: "#3c3a52", wingVein: "#d0ccff", outline: "#f0ecff",
@@ -224,7 +271,9 @@
 
     function resize() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
-      W = innerWidth; H = innerHeight;
+      const viewport = window.visualViewport;
+      W = Math.round(viewport?.width || innerWidth);
+      H = Math.round(viewport?.height || innerHeight);
       canvas.width = Math.floor(W * dpr);
       canvas.height = Math.floor(H * dpr);
       canvas.style.width = W + "px";
@@ -419,7 +468,7 @@
       ctx.restore();
 
       ctx.save();
-      ctx.lineCap = "round";
+            ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.strokeStyle = colors.wingVein;
       ctx.globalAlpha = 0.65;
@@ -638,7 +687,6 @@
       strokePath(shape, colors.outline, 1.35, 0.78);
       ctx.restore();
 
-      // horns
       for (const [i, base] of [
         pt(hc.x + s.x * 19 - f.x * 15, hc.y + s.y * 19 - f.y * 15),
         pt(hc.x - s.x * 19 - f.x * 15, hc.y - s.y * 19 - f.y * 15)
@@ -650,11 +698,10 @@
         strokePath([base, tip, wide], colors.outline, 1, 0.7);
       }
 
-      // eyes
       for (const eye of [
         pt(hc.x + f.x * 15 + s.x * 13, hc.y + f.y * 15 + s.y * 13),
         pt(hc.x + f.x * 15 - s.x * 13, hc.y + f.y * 15 - s.y * 13)
-      ]) {
+              ]) {
         ctx.save();
         ctx.shadowColor = colors.eye;
         ctx.shadowBlur = 16;
@@ -671,7 +718,6 @@
         ctx.restore();
       }
 
-      // mouth line
       ctx.strokeStyle = "rgba(12, 18, 20, 0.7)";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -679,7 +725,6 @@
       ctx.lineTo(jawR.x - f.x * 2, jawR.y - f.y * 2);
       ctx.stroke();
 
-      // nostrils
       for (const sign of [-1, 1]) {
         const n = pt(snout.x - f.x * 10 + s.x * sign * 7, snout.y - f.y * 10 + s.y * sign * 7);
         ctx.fillStyle = "#060c10";
@@ -803,52 +848,89 @@
     function changeColor() {
       palIdx = (palIdx + 1) % palettes.length;
       colors = palettes[palIdx];
+      announce(`Dragon palette: ${colors.name}`);
     }
 
     function toggleHelp() {
       helpOn = !helpOn;
       hud.classList.toggle("hidden", !helpOn);
+      announce(helpOn ? "Controls shown" : "Controls hidden");
+    }
+
+    function announce(message) {
+      statusEl.textContent = message;
+      statusEl.classList.add("visible");
+      clearTimeout(statusTimer);
+      statusTimer = setTimeout(() => statusEl.classList.remove("visible"), 1800);
     }
 
     function frame(now) {
+      if (!pageVisible) return;
       const dt = Math.min(32, now - last);
       last = now;
-      if (!paused) update(dt);
+      if (!paused) update(reduceMotion ? dt * 0.42 : dt);
       else time += dt;
       drawBg();
       drawDragon();
       requestAnimationFrame(frame);
     }
 
-    // Events
-    window.addEventListener("resize", resize);
+    window.addEventListener("resize", resize, { passive: true });
+    window.visualViewport?.addEventListener("resize", resize, { passive: true });
+
     window.addEventListener("mousemove", e => {
       setPointer(e.clientX, e.clientY);
       cursorEl.style.left = e.clientX + "px";
       cursorEl.style.top = e.clientY + "px";
     });
+
     window.addEventListener("mousedown", e => {
       if (e.button !== 0) return;
+      if (e.target.closest("button")) return;
       cursorEl.classList.add("active");
       createFire();
     });
+
     window.addEventListener("mouseup", () => cursorEl.classList.remove("active"));
+
     window.addEventListener("touchstart", e => {
+      if (e.target.closest("button")) return;
       const t = e.touches[0];
       if (t) setPointer(t.clientX, t.clientY);
       createFire();
     }, { passive: true });
+
     window.addEventListener("touchmove", e => {
       const t = e.touches[0];
       if (t) setPointer(t.clientX, t.clientY);
     }, { passive: true });
+
     window.addEventListener("keydown", e => {
       const k = e.key.toLowerCase();
-      if (e.code === "Space") { e.preventDefault(); paused = !paused; }
+
+      if (e.code === "Space") {
+        e.preventDefault();
+        paused = !paused;
+        announce(paused ? "Dragon paused" : "Dragon flying");
+      }
+
       if (k === "f") createFire();
       if (k === "c") changeColor();
-      if (k === "r") resetDragon();
+      if (k === "r") {
+        resetDragon();
+        announce("Dragon reset");
+      }
       if (k === "h") toggleHelp();
+      if (k === "escape" && helpOn) toggleHelp();
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      pageVisible = !document.hidden;
+
+      if (pageVisible) {
+        last = performance.now();
+        requestAnimationFrame(frame);
+      }
     });
 
     document.getElementById("btnFire").addEventListener("click", createFire);
@@ -856,6 +938,7 @@
     document.getElementById("btnHelp").addEventListener("click", toggleHelp);
 
     resize();
+    announce("Dragon Lab ready");
     requestAnimationFrame(frame);
   </script>
 </body>
