@@ -4588,37 +4588,6 @@ body{font-size:16px;}
 #dashboardPage.dragon-chat-mode #dragonCanvas{filter:saturate(1.16) hue-rotate(330deg);}
 @media(max-width:900px){body{font-size:16px}.tool-heading p{font-size:1em}.media-preview img,.media-preview video{max-height:280px}}
 @media(max-width:520px){body{font-size:15.5px}.tool-heading h1{font-size:clamp(28px,8vw,38px)}.media-preview img,.media-preview video{max-height:230px}}
-
-<style>
-/* =========================================================
-   CONTENT VERIFICATION MODES
-========================================================= */
-.verification-mode-switch{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 18px;padding:7px;border:1px solid rgba(0,210,255,.18);border-radius:18px;background:rgba(3,15,28,.72);transition:.35s ease;}
-.verification-mode-tab{border:1px solid rgba(0,210,255,.16);background:rgba(5,22,38,.72);color:#b9d9e8;border-radius:14px;padding:15px 18px;display:flex;align-items:center;gap:12px;text-align:left;cursor:pointer;transition:all .35s ease;font:inherit;}
-.verification-mode-tab>span:first-child{font-size:22px;line-height:1;}
-.verification-mode-tab strong{display:block;color:#e9fbff;font-size:15px;}
-.verification-mode-tab small{display:block;margin-top:4px;color:#7895a4;font-size:11px;}
-.verification-mode-tab.active{border-color:rgba(0,225,255,.65);background:linear-gradient(135deg,rgba(0,150,255,.18),rgba(0,225,255,.07));box-shadow:0 0 24px rgba(0,210,255,.12),inset 0 0 18px rgba(0,210,255,.04);color:#fff;}
-.content-verification-workspace.video-mode .verification-mode-switch{border-color:rgba(255,65,85,.38);box-shadow:0 0 30px rgba(255,45,70,.08);}
-.content-verification-workspace.video-mode .verification-mode-tab.active{border-color:rgba(255,70,90,.72);background:linear-gradient(135deg,rgba(255,45,70,.19),rgba(255,80,100,.06));box-shadow:0 0 28px rgba(255,45,70,.15),inset 0 0 18px rgba(255,45,70,.05);}
-.verification-mode-panel{display:none;animation:verificationModeIn .3s ease both;}
-.verification-mode-panel.active{display:block;}
-.verification-mode-label{font-size:11px;letter-spacing:1.5px;color:#5bdcff;font-weight:800;margin:0 0 9px;}
-.video-mode .verification-mode-label{color:#ff6d7d;}
-.video-upload-zone{min-height:150px;border:1px dashed rgba(0,210,255,.35);border-radius:18px;background:rgba(2,17,30,.72);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;cursor:pointer;padding:24px;transition:.35s ease;}
-.video-upload-zone:hover{border-color:rgba(0,225,255,.8);background:rgba(0,125,190,.08);box-shadow:0 0 30px rgba(0,210,255,.08);}
-.video-mode .video-upload-zone{border-color:rgba(255,65,85,.45);}
-.video-mode .video-upload-zone:hover{border-color:rgba(255,80,100,.85);background:rgba(190,30,50,.08);}
-.video-upload-icon{font-size:32px;margin-bottom:9px;}
-.video-upload-zone strong{color:#eafaff;font-size:15px;}
-.video-upload-zone small{color:#7693a2;margin-top:6px;font-size:11px;}
-.content-video-preview{display:none;margin-top:14px;border:1px solid rgba(0,210,255,.18);border-radius:16px;overflow:hidden;background:#020a12;}
-.content-video-preview.visible{display:block;}
-.content-video-preview video{display:block;width:100%;max-height:390px;background:#000;}
-.verification-note{margin-top:12px;padding:11px 13px;border-radius:12px;background:rgba(255,255,255,.025);color:#718b99;font-size:11px;line-height:1.5;}
-@keyframes verificationModeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-@media(max-width:700px){.verification-mode-switch{grid-template-columns:1fr}.verification-mode-tab{padding:13px}.video-upload-zone{min-height:125px}}
-</style>
 </style>
 
 </head>
@@ -6283,55 +6252,26 @@ body{font-size:16px;}
                     </div>
 
 
-                    <div class="analysis-box content-verification-workspace" id="contentVerificationWorkspace">
+                    <div class="analysis-box">
 
-                        <div class="verification-mode-switch" role="tablist" aria-label="Content verification mode">
-                            <button type="button" id="contentModeTab" class="verification-mode-tab active" onclick="setContentVerificationMode('content')">
-                                <span>🔎</span>
-                                <span><strong>Content / Claim</strong><small>Verify written claims and information</small></span>
-                            </button>
-                            <button type="button" id="videoModeTab" class="verification-mode-tab" onclick="setContentVerificationMode('video')">
-                                <span>🎥</span>
-                                <span><strong>Video Verification</strong><small>Verify claims and information in a video</small></span>
-                            </button>
-                        </div>
+                        <textarea
+                            id="contentInput"
+                            placeholder="
+Enter a claim, statement or piece of information
+you want to investigate...
+"
+                        ></textarea>
 
-                        <div id="contentModePanel" class="verification-mode-panel active">
-                            <div class="verification-mode-label">CONTENT / CLAIM VERIFICATION</div>
-                            <textarea
-                                id="contentInput"
-                                placeholder="Enter a claim, statement or piece of information you want to investigate..."
-                            ></textarea>
-                            <button
-                                id="contentButton"
-                                class="full-button"
-                                onclick="analyzeContent()"
-                            >
-                                Analyze Content
-                            </button>
-                        </div>
 
-                        <div id="videoModePanel" class="verification-mode-panel">
-                            <div class="verification-mode-label">VIDEO VERIFICATION</div>
-                            <label class="video-upload-zone" for="contentVideoInput">
-                                <span class="video-upload-icon">🎥</span>
-                                <strong id="contentVideoName">Choose a video to verify</strong>
-                                <small>MP4, WebM or MOV • claims and information only</small>
-                            </label>
-                            <input id="contentVideoInput" type="file" accept="video/mp4,video/webm,video/quicktime,video/*" hidden onchange="handleContentVideoSelection(this)">
-                            <div id="contentVideoPreview" class="content-video-preview">
-                                <video id="contentVideoPlayer" controls playsinline></video>
-                            </div>
-                            <button
-                                id="videoVerificationButton"
-                                class="full-button"
-                                onclick="analyzeVerificationVideo()"
-                                disabled
-                            >
-                                Verify Video Claims
-                            </button>
-                            <div class="verification-note">This mode checks claims and information in the video. It does not perform deepfake or manipulation detection.</div>
-                        </div>
+                        <button
+                            id="contentButton"
+                            class="full-button"
+                            onclick="
+                                analyzeContent()
+                            "
+                        >
+                            Analyze Content
+                        </button>
 
 
                         <div
@@ -9249,113 +9189,6 @@ Clearly distinguish:
            CONTENT
         ===================================================== */
 
-        let contentVerificationMode = "content";
-        let selectedVerificationVideo = null;
-
-        function setContentVerificationMode(mode) {
-            contentVerificationMode = mode === "video" ? "video" : "content";
-            const workspace = document.getElementById("contentVerificationWorkspace");
-            const contentTab = document.getElementById("contentModeTab");
-            const videoTab = document.getElementById("videoModeTab");
-            const contentPanel = document.getElementById("contentModePanel");
-            const videoPanel = document.getElementById("videoModePanel");
-            if (!workspace || !contentTab || !videoTab || !contentPanel || !videoPanel) return;
-            const isVideo = contentVerificationMode === "video";
-            workspace.classList.toggle("video-mode", isVideo);
-            contentTab.classList.toggle("active", !isVideo);
-            videoTab.classList.toggle("active", isVideo);
-            contentPanel.classList.toggle("active", !isVideo);
-            videoPanel.classList.toggle("active", isVideo);
-            window.trueAegisDragon?.setState(isVideo ? "alert" : "scan");
-        }
-
-        function handleContentVideoSelection(input) {
-            const file = input?.files?.[0];
-            const name = document.getElementById("contentVideoName");
-            const preview = document.getElementById("contentVideoPreview");
-            const player = document.getElementById("contentVideoPlayer");
-            const button = document.getElementById("videoVerificationButton");
-            if (!file) {
-                selectedVerificationVideo = null;
-                if (name) name.textContent = "Choose a video to verify";
-                if (preview) preview.classList.remove("visible");
-                if (button) button.disabled = true;
-                if (player) { player.removeAttribute("src"); player.load(); }
-                return;
-            }
-            if (!file.type.startsWith("video/")) {
-                if (name) name.textContent = "Please choose a supported video";
-                if (button) button.disabled = true;
-                return;
-            }
-            selectedVerificationVideo = file;
-            if (name) name.textContent = `${file.name} • ${(file.size / 1024 / 1024).toFixed(2)} MB`;
-            if (player) {
-                if (player.dataset.objectUrl) URL.revokeObjectURL(player.dataset.objectUrl);
-                const url = URL.createObjectURL(file);
-                player.dataset.objectUrl = url;
-                player.src = url;
-            }
-            if (preview) preview.classList.add("visible");
-            if (button) button.disabled = false;
-        }
-
-        function fileToBase64Data(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(String(reader.result || ""));
-                reader.onerror = () => reject(new Error("Could not read the video file."));
-                reader.readAsDataURL(file);
-            });
-        }
-
-        async function analyzeVerificationVideo() {
-            const file = selectedVerificationVideo;
-            const button = document.getElementById("videoVerificationButton");
-            const report = document.getElementById("contentReport");
-            if (!file) {
-                report.textContent = "Please choose a video first.";
-                return;
-            }
-            button.disabled = true;
-            button.textContent = "Verifying Video…";
-            report.textContent = "Video Verification is examining claims and information in the video…";
-            window.trueAegisDragon?.setState("alert");
-            let timer = null;
-            try {
-                const dataUrl = await fileToBase64Data(file);
-                let progress = 10;
-                const setProgress = () => {
-                    progress = Math.min(progress + 4, 90);
-                    report.textContent = `Video Verification is processing the video… ${progress}%`;
-                };
-                timer = setInterval(setProgress, 900);
-                const result = await apiRequest("/api/video-verification", {
-                    video: dataUrl,
-                    media: dataUrl,
-                    filename: file.name,
-                    mimeType: file.type || "video/mp4",
-                    mode: "video"
-                });
-                clearInterval(timer);
-                timer = null;
-                report.textContent = result.analysis || result.reply || result.result?.summary || result.message || "No verification result was returned.";
-                if (result.provider) report.textContent += `\n\nProvider: ${result.provider}`;
-                if (result.warning) report.textContent += `\n\n${result.warning}`;
-                incrementStat("content");
-                addActivity("🎥", "Video Verification", file.name);
-                window.trueAegisDragon?.setState("scan");
-            } catch (error) {
-                if (timer) clearInterval(timer);
-                console.error("[TrueAegis] Video verification error:", error);
-                report.textContent = error?.message || "Video verification failed. Please try again.";
-                window.trueAegisDragon?.setState("idle");
-            } finally {
-                button.disabled = false;
-                button.textContent = "Verify Video Claims";
-            }
-        }
-
         async function analyzeContent() {
             window.trueAegisDragon?.setState("scan");
 
@@ -9412,8 +9245,6 @@ Clearly distinguish:
                     await apiRequest(
                         "/api/content-verification",
                         {
-
-                            mode: "content",
 
                             claim:
                                 input +
@@ -9547,30 +9378,9 @@ Clearly distinguish:
                     );
 
 
-                const newsAnalysis =
-                result.analysis ||
-                result.reply ||
-                result.report ||
-                result.message ||
-                "";
-
-            report.textContent =
-                newsAnalysis ||
-                "No analysis was returned.";
-
-            if (
-                Array.isArray(result.citations) &&
-                result.citations.length
-            ) {
-                report.textContent +=
-                    "\n\nSources:\n" +
-                    result.citations
-                        .map(
-                            (url, index) =>
-                                `${index + 1}. ${url}`
-                        )
-                        .join("\n");
-            }
+                report.textContent =
+                    result.reply ||
+                    "No analysis was returned.";
 
 
                 if (
