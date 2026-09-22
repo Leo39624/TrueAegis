@@ -4621,6 +4621,164 @@ body{font-size:16px;}
 </style>
 </style>
 
+
+<style>
+/* =========================================================
+   CONTENT VERIFICATION — SLIDING MODE SWITCH + BRIGHT VIDEO THEME
+========================================================= */
+.content-verification-heading-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:24px;
+    margin-bottom:20px;
+}
+.content-verification-heading-row .tool-heading{
+    flex:1 1 auto;
+    min-width:0;
+    margin:0;
+}
+.content-verification-heading-row .tool-heading h1{margin-bottom:7px;}
+.content-verification-heading-row .tool-heading p{margin:0;max-width:780px;}
+.verification-mode-switch{
+    position:relative;
+    flex:0 0 238px;
+    width:238px;
+    height:54px;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:0;
+    padding:4px;
+    margin:0;
+    border:1px solid rgba(0,218,255,.34);
+    border-radius:999px;
+    background:rgba(7,28,43,.78);
+    box-shadow:0 8px 28px rgba(0,0,0,.18),inset 0 1px rgba(255,255,255,.06);
+    overflow:hidden;
+    transition:background .35s ease,border-color .35s ease,box-shadow .35s ease;
+}
+.mode-switch-thumb{
+    position:absolute;
+    top:4px;
+    left:4px;
+    width:calc(50% - 4px);
+    height:44px;
+    border-radius:999px;
+    background:linear-gradient(135deg,#087fa9,#00bde9);
+    box-shadow:0 0 22px rgba(0,211,255,.30),inset 0 1px rgba(255,255,255,.25);
+    transition:transform .35s cubic-bezier(.2,.8,.2,1),background .35s ease,box-shadow .35s ease;
+    z-index:0;
+}
+.verification-mode-tab{
+    position:relative;
+    z-index:1;
+    min-width:0;
+    border:0;
+    border-radius:999px;
+    padding:0 13px;
+    background:transparent;
+    color:#91b2c2;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    text-align:center;
+    cursor:pointer;
+    transition:color .3s ease,transform .2s ease;
+    font:inherit;
+    font-size:13px;
+    font-weight:850;
+}
+.verification-mode-tab:hover{color:#ecfbff;}
+.verification-mode-tab:active{transform:scale(.97);}
+.verification-mode-tab.active{color:#fff;background:transparent;border:0;box-shadow:none;}
+.mode-tab-icon{font-size:17px;line-height:1;}
+.verification-mode-switch .verification-mode-tab span:last-child{white-space:nowrap;}
+.content-verification-workspace.video-mode .mode-switch-thumb{
+    transform:translateX(100%);
+    background:linear-gradient(135deg,#d81f3b,#ff4d63);
+    box-shadow:0 0 26px rgba(255,45,70,.42),inset 0 1px rgba(255,255,255,.28);
+}
+.content-verification-workspace.video-mode ~ *{}
+body.video-verification-active{
+    transition:background .5s ease;
+    background:#1a070b !important;
+}
+body.video-verification-active #dashboardPage{
+    background:#1a070b;
+}
+body.video-verification-active #dashboardPage .dragon-bg-layer{
+    background:#21070c;
+}
+body.video-verification-active #dashboardPage .dragon-bg-layer::after{
+    background:
+        radial-gradient(circle at 72% 24%,rgba(255,45,68,.42),transparent 38%),
+        radial-gradient(circle at 32% 78%,rgba(190,20,45,.22),transparent 40%),
+        linear-gradient(90deg,rgba(75,7,17,.84),rgba(115,10,28,.30) 46%,rgba(43,5,12,.62));
+}
+body.video-verification-active #dashboardPage .dragon-bg-layer::before{
+    background-image:
+        linear-gradient(rgba(255,75,95,.075) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,75,95,.075) 1px,transparent 1px);
+}
+body.video-verification-active #dashboardPage #dragonCanvas{
+    filter:contrast(1.08) saturate(1.15) brightness(1.02) hue-rotate(318deg);
+    opacity:.68;
+}
+body.video-verification-active #dashboardPage .sidebar{
+    background:linear-gradient(180deg,rgba(48,7,15,.94),rgba(31,5,11,.91));
+    border-right-color:rgba(255,65,85,.30);
+    box-shadow:18px 0 55px rgba(0,0,0,.18),inset -1px 0 rgba(255,65,85,.06);
+}
+body.video-verification-active #dashboardPage .dashboard-main{
+    background:
+        radial-gradient(circle at 56% 8%,rgba(255,48,72,.20),transparent 34%),
+        linear-gradient(90deg,rgba(58,7,16,.48),rgba(80,8,20,.20));
+}
+body.video-verification-active #dashboardPage .dashboard-header{border-bottom-color:rgba(255,75,95,.30);}
+body.video-verification-active #dashboardPage .dashboard-header h1,
+body.video-verification-active #dashboardPage .tool-heading h1{color:#fff2f4;text-shadow:0 0 20px rgba(255,45,70,.18);}
+body.video-verification-active #dashboardPage .dashboard-header p,
+body.video-verification-active #dashboardPage .tool-heading p{color:#c9959d;}
+body.video-verification-active #dashboardPage .card,
+body.video-verification-active #dashboardPage .analysis-box,
+body.video-verification-active #dashboardPage .quick-card,
+body.video-verification-active #dashboardPage .chat-wrapper,
+body.video-verification-active #dashboardPage .stat-card{
+    border-color:rgba(255,70,90,.25);
+    background-image:linear-gradient(135deg,rgba(255,55,75,.105),rgba(255,255,255,.025) 42%,rgba(255,40,60,.06));
+}
+body.video-verification-active #dashboardPage .verification-mode-switch{
+    border-color:rgba(255,70,90,.48);
+    background:rgba(70,8,18,.74);
+    box-shadow:0 8px 30px rgba(255,30,55,.10),inset 0 1px rgba(255,255,255,.07);
+}
+body.video-verification-active #dashboardPage .verification-mode-label{color:#ff7484;}
+body.video-verification-active #dashboardPage .video-upload-zone{
+    border-color:rgba(255,75,95,.62);
+    background:rgba(92,10,24,.30);
+    box-shadow:0 0 34px rgba(255,35,60,.10);
+}
+body.video-verification-active #dashboardPage .video-upload-zone:hover{
+    border-color:rgba(255,110,125,.95);
+    background:rgba(150,18,40,.30);
+}
+body.video-verification-active #dashboardPage .full-button{
+    border-color:rgba(255,75,95,.58);
+    background:linear-gradient(135deg,#b91635,#f43d59);
+    box-shadow:0 0 28px rgba(255,35,60,.20);
+}
+body.video-verification-active #dashboardPage .full-button:hover{box-shadow:0 0 36px rgba(255,35,60,.34);}
+@media(max-width:850px){
+    .content-verification-heading-row{align-items:flex-start;flex-direction:column;gap:14px;}
+    .verification-mode-switch{width:238px;flex-basis:54px;}
+}
+@media(max-width:520px){
+    .content-verification-heading-row{gap:12px;}
+    .verification-mode-switch{width:100%;max-width:320px;}
+}
+</style>
+
 </head>
 
 
@@ -6265,36 +6423,31 @@ body{font-size:16px;}
                     class="dashboard-section"
                 >
 
-                    <div class="tool-heading">
-
-                        <h1>
-                            🔎 Content Verification
-                        </h1>
-
-                        <p>
-                            <strong>
-                                Evidence Lens
-                            </strong>
-                            — a careful, analytical verifier
-                            that separates claims, context,
-                            evidence and uncertainty.
-                        </p>
-
-                    </div>
-
-
-                    <div class="analysis-box content-verification-workspace" id="contentVerificationWorkspace">
+                    <div class="content-verification-heading-row">
+                        <div class="tool-heading">
+                            <h1>
+                                🔎 Content Verification
+                            </h1>
+                            <p>
+                                <strong>Evidence Lens</strong> — a careful, analytical verifier
+                                that separates claims, context, evidence and uncertainty.
+                            </p>
+                        </div>
 
                         <div class="verification-mode-switch" role="tablist" aria-label="Content verification mode">
-                            <button type="button" id="contentModeTab" class="verification-mode-tab active" onclick="setContentVerificationMode('content')">
-                                <span>🔎</span>
-                                <span><strong>Content / Claim</strong><small>Verify written claims and information</small></span>
+                            <span class="mode-switch-thumb" aria-hidden="true"></span>
+                            <button type="button" id="contentModeTab" class="verification-mode-tab active" aria-selected="true" onclick="setContentVerificationMode('content')">
+                                <span class="mode-tab-icon">🔎</span>
+                                <span>Content</span>
                             </button>
-                            <button type="button" id="videoModeTab" class="verification-mode-tab" onclick="setContentVerificationMode('video')">
-                                <span>🎥</span>
-                                <span><strong>Video Verification</strong><small>Verify claims and information in a video</small></span>
+                            <button type="button" id="videoModeTab" class="verification-mode-tab" aria-selected="false" onclick="setContentVerificationMode('video')">
+                                <span class="mode-tab-icon">🎥</span>
+                                <span>Video</span>
                             </button>
                         </div>
+                    </div>
+
+                    <div class="analysis-box content-verification-workspace" id="contentVerificationWorkspace">
 
                         <div id="contentModePanel" class="verification-mode-panel active">
                             <div class="verification-mode-label">CONTENT / CLAIM VERIFICATION</div>
@@ -8079,6 +8232,9 @@ Clearly distinguish:
             section,
             clickedButton = null
         ) {
+            if (section !== "content") {
+                document.body.classList.remove("video-verification-active");
+            }
             if (window.trueAegisDragon) {
                 const dragonState = { overview: "idle", deepfake: "scan", content: "scan", news: "scan", chat: "chat" }[section] || "idle";
                 window.trueAegisDragon.setState(dragonState);
@@ -9262,8 +9418,11 @@ Clearly distinguish:
             if (!workspace || !contentTab || !videoTab || !contentPanel || !videoPanel) return;
             const isVideo = contentVerificationMode === "video";
             workspace.classList.toggle("video-mode", isVideo);
+            document.body.classList.toggle("video-verification-active", isVideo);
             contentTab.classList.toggle("active", !isVideo);
             videoTab.classList.toggle("active", isVideo);
+            contentTab.setAttribute("aria-selected", String(!isVideo));
+            videoTab.setAttribute("aria-selected", String(isVideo));
             contentPanel.classList.toggle("active", !isVideo);
             videoPanel.classList.toggle("active", isVideo);
             window.trueAegisDragon?.setState(isVideo ? "alert" : "scan");
