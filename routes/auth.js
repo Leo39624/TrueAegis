@@ -1178,23 +1178,21 @@ router.post(
    GOOGLE CONFIG
 ============================================================ */
 
-router.get(
-    "/google/config",
-    (req, res) => {
-        if (!GOOGLE_CLIENT_ID) {
-            return res.status(503).json({
-                success: false,
-                message:
-                    "Google Login is not configured."
-            });
-        }
-
-        res.json({
-            success: true,
-            clientId: GOOGLE_CLIENT_ID
+router.get("/google/config", (req, res) => {
+    if (!GOOGLE_CLIENT_ID) {
+        return res.status(503).json({
+            success: false,
+            message: "Google Login is not configured."
         });
     }
-);
+
+    res.json({
+        success: true,
+        clientId: GOOGLE_CLIENT_ID,
+        redirectUri: GOOGLE_REDIRECT_URI,
+        baseUrl: BASE_URL
+    });
+});
 
 /* ============================================================
    EXPORT AUTH MIDDLEWARE
