@@ -4777,6 +4777,150 @@ body.video-verification-active #dashboardPage .full-button:hover{box-shadow:0 0 
     .content-verification-heading-row{gap:12px;}
     .verification-mode-switch{width:100%;max-width:320px;}
 }
+
+/* =========================================================
+   TRUEAEGIS UI UPGRADE — NEUTRAL MODES + QUIETER GUARDIAN
+   ========================================================= */
+
+/* Keep routine mode switching in the brand palette. Red is reserved for danger/errors. */
+.content-verification-heading-row{
+    align-items:flex-start;
+    margin-bottom:16px;
+}
+.verification-mode-switch{
+    position:relative !important;
+    flex:0 0 270px !important;
+    width:270px !important;
+    height:52px !important;
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:4px !important;
+    padding:4px !important;
+    margin:0 !important;
+    border:1px solid rgba(0,217,255,.22) !important;
+    border-radius:14px !important;
+    background:rgba(4,18,29,.92) !important;
+    box-shadow:0 8px 24px rgba(0,0,0,.18), inset 0 1px rgba(255,255,255,.035) !important;
+    overflow:visible !important;
+}
+.mode-switch-thumb{display:none !important;}
+.verification-mode-tab{
+    min-width:0 !important;
+    height:42px !important;
+    border:1px solid transparent !important;
+    border-radius:10px !important;
+    padding:0 13px !important;
+    background:transparent !important;
+    color:#7f99aa !important;
+    gap:7px !important;
+    box-shadow:none !important;
+    transform:none !important;
+}
+.verification-mode-tab:hover{color:#dff9ff !important;background:rgba(0,217,255,.055) !important;}
+.verification-mode-tab.active{
+    color:#f4fdff !important;
+    border-color:rgba(0,217,255,.42) !important;
+    background:linear-gradient(135deg,rgba(0,150,255,.20),rgba(0,217,255,.085)) !important;
+    box-shadow:0 0 20px rgba(0,217,255,.10), inset 0 1px rgba(255,255,255,.06) !important;
+}
+.content-verification-workspace.video-mode .verification-mode-switch,
+.content-verification-workspace.video-mode .verification-mode-tab.active{
+    border-color:rgba(0,217,255,.42) !important;
+    box-shadow:0 0 20px rgba(0,217,255,.10), inset 0 1px rgba(255,255,255,.06) !important;
+    background:rgba(4,18,29,.92) !important;
+}
+.content-verification-workspace.video-mode .verification-mode-tab.active{
+    background:linear-gradient(135deg,rgba(0,150,255,.20),rgba(0,217,255,.085)) !important;
+}
+.video-mode .verification-mode-label{color:#5bdcff !important;}
+.video-mode .video-upload-zone,
+.video-mode .video-upload-zone:hover{
+    border-color:rgba(0,210,255,.35) !important;
+    background:rgba(2,17,30,.72) !important;
+    box-shadow:none !important;
+}
+.video-mode .video-upload-zone:hover{border-color:rgba(0,225,255,.8) !important;box-shadow:0 0 30px rgba(0,210,255,.08) !important;}
+
+/* Neutralize the legacy full-screen red video theme. */
+body.video-verification-active,
+body.video-verification-active #dashboardPage{
+    background:#020a11 !important;
+}
+body.video-verification-active #dashboardPage .dragon-bg-layer{
+    background:radial-gradient(circle at 70% 25%,rgba(0,217,255,.035),transparent 30%),#020a11 !important;
+}
+body.video-verification-active #dashboardPage .dragon-bg-layer::after{
+    background:radial-gradient(circle at 72% 30%,rgba(45,120,255,.075),transparent 42%),linear-gradient(90deg,rgba(2,8,14,.84),rgba(2,8,14,.35) 48%,rgba(2,8,14,.72)) !important;
+}
+body.video-verification-active #dashboardPage .dragon-bg-layer::before{
+    background-image:linear-gradient(rgba(0,188,235,.027) 1px,transparent 1px),linear-gradient(90deg,rgba(0,188,235,.027) 1px,transparent 1px) !important;
+}
+body.video-verification-active #dashboardPage #dragonCanvas{
+    filter:contrast(1.04) saturate(.95) brightness(.82) hue-rotate(0deg) !important;
+    opacity:.28 !important;
+}
+body.video-verification-active #dashboardPage .sidebar,
+body.video-verification-active #dashboardPage .dashboard-main{
+    background:inherit !important;
+    border-color:rgba(62,155,196,.22) !important;
+    box-shadow:none !important;
+}
+body.video-verification-active #dashboardPage .dashboard-header,
+body.video-verification-active #dashboardPage .tool-heading h1{border-color:rgba(62,155,196,.22) !important;color:inherit !important;text-shadow:none !important;}
+body.video-verification-active #dashboardPage .dashboard-header p,
+body.video-verification-active #dashboardPage .tool-heading p{color:#8299aa !important;}
+
+/* Quieter dragon: it remains part of the identity but stays behind the product. */
+#dashboardPage .dragon-bg-layer{opacity:.82;}
+#dragonCanvas{opacity:.28 !important;filter:contrast(1.02) saturate(.82) brightness(.76) !important;}
+#dashboardPage .dragon-bg-layer::after{background:linear-gradient(90deg,rgba(2,8,14,.94),rgba(2,8,14,.74) 42%,rgba(2,8,14,.42) 70%,rgba(2,8,14,.82)) !important;}
+
+/* Reduce excess vertical air before the primary dashboard content. */
+#dashboardPage .dashboard-main{padding-top:20px !important;}
+#dashboardPage .dashboard-header{margin-bottom:18px !important;}
+
+/* Settings lives in the same dashboard shell and contains destructive actions away from navigation. */
+.settings-standalone{min-height:100vh;padding:34px 7%;background:#020a11;}
+.settings-shell{max-width:1100px;margin:0 auto;}
+.settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;}
+.settings-card{padding:24px;border:1px solid #1b384d;border-radius:16px;background:rgba(7,21,32,.90);box-shadow:inset 0 1px rgba(255,255,255,.025),0 18px 55px rgba(0,0,0,.16);}
+.settings-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px;}
+.settings-card h2{margin:0 0 7px;font-size:19px;}
+.settings-card-head p{margin:0;color:#8299aa;line-height:1.55;font-size:13px;}
+.settings-badge{flex:0 0 auto;padding:6px 9px;border:1px solid rgba(0,217,255,.18);border-radius:999px;color:#6f9bb0;font-size:9px;font-weight:900;letter-spacing:1.2px;}
+.settings-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 0;border-top:1px solid rgba(31,64,83,.7);}
+.settings-row.subtle{align-items:flex-start;}
+.settings-row strong,.settings-danger strong{display:block;color:#eaf7fc;font-size:14px;}
+.settings-row span,.settings-danger span{display:block;margin-top:5px;color:#718b9c;font-size:12px;line-height:1.5;}
+.settings-toggle{display:inline-flex;align-items:center;gap:9px;flex:0 0 auto;padding:8px 11px;border:1px solid rgba(0,217,255,.26);border-radius:999px;background:#071a28;color:#dffaff;font-size:11px;font-weight:800;}
+.settings-toggle-dot{width:10px;height:10px;border-radius:50%;background:#00d9ff;box-shadow:0 0 12px rgba(0,217,255,.55);}
+.settings-toggle.off{border-color:#3b4c59;color:#8295a2;background:#0a131a;}
+.settings-toggle.off .settings-toggle-dot{background:#60717d;box-shadow:none;}
+.settings-status{color:#55e4aa !important;font-weight:800;white-space:nowrap;}
+.settings-danger{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:16px;padding:16px;border:1px solid rgba(255,97,97,.18);border-radius:12px;background:rgba(255,70,70,.035);}
+.settings-delete-button{color:#ff9fa8 !important;background:transparent !important;border:1px solid rgba(255,97,97,.28) !important;}
+.settings-delete-button:hover{border-color:rgba(255,97,97,.58) !important;background:rgba(180,45,45,.10) !important;}
+#dashboardPage .sidebar .delete-account-button{display:none !important;}
+
+@media(max-width:820px){
+    .content-verification-heading-row{display:block;}
+    .verification-mode-switch{width:100% !important;max-width:none !important;margin-top:14px !important;}
+    .settings-grid{grid-template-columns:1fr;}
+}
+@media(max-width:560px){
+    .settings-standalone{padding:24px 14px 40px;}
+    .settings-card{padding:18px;}
+    .settings-row,.settings-danger{align-items:flex-start;flex-direction:column;}
+    .settings-toggle,.settings-row .btn,.settings-danger .btn{width:100%;justify-content:center;}
+}
+
+/* Respect OS reduced-motion and manual motion state. */
+@media (prefers-reduced-motion: reduce){
+    #dragonCanvas{opacity:.12 !important;}
+}
+body.trueaegis-dragon-motion-off #dragonCanvas{opacity:.09 !important;}
+body.trueaegis-dragon-motion-off #dashboardPage .dragon-bg-layer::after{background:linear-gradient(90deg,rgba(2,8,14,.96),rgba(2,8,14,.84) 45%,rgba(2,8,14,.68) 72%,rgba(2,8,14,.90)) !important;}
+
 </style>
 
 </head>
@@ -5931,6 +6075,18 @@ body.video-verification-active #dashboardPage .full-button:hover{box-shadow:0 0 
                     🤖 AI Assistant
                 </button>
 
+                <button
+                    class="sidebar-button"
+                    onclick="
+                        openDashboard(
+                            'settings',
+                            this
+                        )
+                    "
+                >
+                    ⚙️ Settings
+                </button>
+
 
                 <div class="sidebar-section-title">
                     ACCOUNT
@@ -6680,6 +6836,77 @@ that you want investigated...
 
         </div>
 
+    </section>
+
+
+    <!-- =====================================================
+         SETTINGS
+    ===================================================== -->
+
+    <section id="settingsSection" class="dashboard-section settings-standalone">
+        <div class="settings-shell">
+            <div class="tool-heading">
+                <h1>⚙️ Settings</h1>
+                <p>Control the TrueAegis experience without changing the core verification tools.</p>
+            </div>
+
+            <div class="settings-grid">
+                <div class="settings-card">
+                    <div class="settings-card-head">
+                        <div>
+                            <h2>Guardian Background</h2>
+                            <p>Reduce or pause the animated dragon environment behind your workspace.</p>
+                        </div>
+                        <span class="settings-badge">APPEARANCE</span>
+                    </div>
+
+                    <div class="settings-row">
+                        <div>
+                            <strong>Dragon motion</strong>
+                            <span>Pause background movement while keeping the visual identity visible.</span>
+                        </div>
+                        <button id="dragonMotionToggle" type="button" class="settings-toggle" role="switch" aria-checked="true" onclick="toggleDragonMotion()">
+                            <span class="settings-toggle-dot"></span>
+                            <span id="dragonMotionLabel">Motion On</span>
+                        </button>
+                    </div>
+
+                    <div class="settings-row subtle">
+                        <div>
+                            <strong>Reduced-motion support</strong>
+                            <span>TrueAegis automatically respects your operating system's reduced-motion preference.</span>
+                        </div>
+                        <span id="reducedMotionStatus" class="settings-status">Detecting…</span>
+                    </div>
+                </div>
+
+                <div class="settings-card">
+                    <div class="settings-card-head">
+                        <div>
+                            <h2>Account</h2>
+                            <p>Manage your session and account-level actions.</p>
+                        </div>
+                        <span class="settings-badge">ACCOUNT</span>
+                    </div>
+
+                    <div class="settings-row">
+                        <div>
+                            <strong>Sign out</strong>
+                            <span>End your current TrueAegis session on this device.</span>
+                        </div>
+                        <button type="button" class="btn btn-secondary" onclick="logout()">Log out</button>
+                    </div>
+
+                    <div class="settings-danger">
+                        <div>
+                            <strong>Danger Zone</strong>
+                            <span>Permanently delete your TrueAegis account. This action requires confirmation.</span>
+                        </div>
+                        <button type="button" class="btn settings-delete-button" onclick="openDeleteAccountDialog()">Delete account</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </section>
 
 
@@ -10381,6 +10608,28 @@ Clearly distinguish:
            PERSISTENT DRAGON ENVIRONMENT
            Runs only inside the logged-in dashboard.
            ===================================================== */
+        let dragonMotionEnabled = true;
+        const dragonReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+
+        function applyDragonMotionState() {
+            const off = !dragonMotionEnabled || dragonReducedMotion;
+            document.body.classList.toggle('trueaegis-dragon-motion-off', off);
+            const toggle = document.getElementById('dragonMotionToggle');
+            const label = document.getElementById('dragonMotionLabel');
+            if (toggle) {
+                toggle.classList.toggle('off', !dragonMotionEnabled);
+                toggle.setAttribute('aria-checked', String(dragonMotionEnabled));
+            }
+            if (label) label.textContent = dragonMotionEnabled ? 'Motion On' : 'Motion Off';
+            const reduced = document.getElementById('reducedMotionStatus');
+            if (reduced) reduced.textContent = dragonReducedMotion ? 'OS setting active' : 'Available';
+        }
+
+        function toggleDragonMotion() {
+            dragonMotionEnabled = !dragonMotionEnabled;
+            applyDragonMotionState();
+        }
+
         const trueAegisDragon = (() => {
             const canvas = document.getElementById("dragonCanvas");
             if (!canvas) return null;
@@ -10562,7 +10811,10 @@ Clearly distinguish:
             function loop(now) {
                 const dt=Math.min(32,now-last);last=now;
                 const dashboard=document.getElementById("dashboardPage");
-                if(dashboard && !dashboard.classList.contains("hidden")) { update(dt);render(); }
+                if(dashboard && !dashboard.classList.contains("hidden")) {
+                    if (dragonMotionEnabled && !dragonReducedMotion) update(dt);
+                    render();
+                }
                 requestAnimationFrame(loop);
             }
 
@@ -10588,6 +10840,7 @@ Clearly distinguish:
         })();
 
         window.trueAegisDragon = trueAegisDragon;
+        applyDragonMotionState();
 
     </script>
 
