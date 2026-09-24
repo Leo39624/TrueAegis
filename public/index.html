@@ -10808,7 +10808,432 @@ Clearly distinguish:
             const list = v => (Array.isArray(v) ? v : [v]).filter(Boolean).map(x => `<li>${escapeHtml(typeof x === 'object' ? (x.summary || x.description || JSON.stringify(x)) : x)}</li>`).join('');
             const w = window.open('', '_blank', 'width=900,height=800');
             if (!w) { showTrueAegisToast('Allow pop-ups to export the report as PDF.'); return; }
-            w.document.write(`<!doctype html><html><head><title>TrueAegis Verification Report</title><style>body{font-family:Arial,sans-serif;padding:40px;color:#17232c;line-height:1.55}h1{color:#087f9d}h2{margin-top:28px}ul{padding-left:22px}.meta{color:#607582}</style></head><body><h1>TrueAegis Verification Report</h1><div class="meta">${escapeHtml(trueAegisLastFileName)} · ${new Date().toLocaleString()}</div><h2>Overall Assessment</h2><p>${escapeHtml(r.summary || r.verdict || 'Inconclusive')}</p><h2>Suspicion Level</h2><p>${escapeHtml(r.suspicionLevel || 'Unknown')} · Confidence ${escapeHtml(r.confidence ?? 0)}%</p><h2>Evidence</h2><ul>${list(r.evidence)}</ul><h2>Limitations</h2><ul>${list(r.limitations)}</ul><h2>Verification Steps</h2><ul>${list(r.verificationSteps)}</ul><p><strong>Notice:</strong> AI assessment is not definitive proof. Independently verify important findings.</p></body></html>`); w.document.close(); setTimeout(()=>w.print(),250); }
+            w.document.write(`<!doctype html><html><head><title>TrueAegis Verification Report</title><style>body{font-family:Arial,sans-serif;padding:40px;color:#17232c;line-height:1.55}h1{color:#087f9d}h2{margin-top:28px}ul{padding-left:22px}.meta{color:#607582}</style><style id="trueaegis-elite-ui">
+/* =========================================================
+   TRUEAEGIS ELITE UI LAYER
+   Premium SaaS polish without replacing the existing design.
+   ========================================================= */
+
+html{
+    scroll-padding-top:84px;
+}
+body{
+    text-rendering:optimizeLegibility;
+    -webkit-font-smoothing:antialiased;
+}
+body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    z-index:9998;
+    opacity:.22;
+    background-image:radial-gradient(rgba(255,255,255,.06) .55px,transparent .55px);
+    background-size:5px 5px;
+    mix-blend-mode:soft-light;
+}
+html[data-ta-theme="light"] body::before{opacity:.12;background-image:radial-gradient(rgba(20,30,35,.07) .55px,transparent .55px);mix-blend-mode:multiply}
+
+/* Premium page depth */
+.dashboard,
+.landing-page,
+.auth-page{
+    position:relative;
+}
+.dashboard::after,
+.landing-page::after{
+    content:"";
+    position:fixed;
+    inset:auto 0 0;
+    height:180px;
+    pointer-events:none;
+    z-index:0;
+    background:linear-gradient(to top,rgba(0,0,0,.16),transparent);
+}
+html[data-ta-theme="light"] .dashboard::after,
+html[data-ta-theme="light"] .landing-page::after{
+    background:linear-gradient(to top,rgba(92,77,50,.06),transparent);
+}
+
+/* Sidebar becomes a real workspace rail */
+.dashboard{
+    grid-template-columns:245px minmax(0,1fr);
+    transition:grid-template-columns .3s cubic-bezier(.22,1,.36,1);
+}
+.dashboard.ta-sidebar-collapsed{
+    grid-template-columns:78px minmax(0,1fr);
+}
+.dashboard.ta-sidebar-collapsed .sidebar{
+    padding-left:10px;
+    padding-right:10px;
+}
+.dashboard.ta-sidebar-collapsed .sidebar-section-title,
+.dashboard.ta-sidebar-collapsed .sidebar .nav-label,
+.dashboard.ta-sidebar-collapsed .sidebar .sidebar-brand-text,
+.dashboard.ta-sidebar-collapsed .sidebar .sidebar-user-copy{
+    display:none!important;
+}
+.dashboard.ta-sidebar-collapsed .sidebar button,
+.dashboard.ta-sidebar-collapsed .sidebar a{
+    justify-content:center;
+}
+.ta-sidebar-toggle{
+    position:absolute;
+    top:18px;
+    right:-13px;
+    width:28px;
+    height:28px;
+    border:1px solid var(--ta-border-strong);
+    border-radius:50%;
+    display:grid;
+    place-items:center;
+    z-index:20;
+    cursor:pointer;
+    color:var(--ta-text);
+    background:var(--ta-surface);
+    box-shadow:0 8px 22px rgba(0,0,0,.24);
+    transition:.22s ease;
+}
+.ta-sidebar-toggle:hover{
+    transform:scale(1.08);
+    box-shadow:0 0 24px var(--ta-glow);
+}
+.sidebar{position:relative;z-index:5}
+
+/* Unified premium surfaces */
+.dashboard .panel,
+.dashboard .card,
+.dashboard .stat-card,
+.dashboard .quick-card,
+.dashboard .tool-card,
+.dashboard .result-card,
+.dashboard .settings-card,
+.dashboard .workspace-card{
+    transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease,background .22s ease;
+}
+.dashboard .panel:hover,
+.dashboard .card:hover,
+.dashboard .stat-card:hover,
+.dashboard .quick-card:hover,
+.dashboard .tool-card:hover,
+.dashboard .result-card:hover,
+.dashboard .settings-card:hover{
+    transform:translateY(-2px);
+    border-color:var(--ta-border-strong)!important;
+    box-shadow:0 18px 55px rgba(0,0,0,.18),0 0 28px var(--ta-glow);
+}
+html[data-ta-theme="light"] .dashboard .panel:hover,
+html[data-ta-theme="light"] .dashboard .card:hover,
+html[data-ta-theme="light"] .dashboard .stat-card:hover,
+html[data-ta-theme="light"] .dashboard .quick-card:hover,
+html[data-ta-theme="light"] .dashboard .tool-card:hover,
+html[data-ta-theme="light"] .dashboard .result-card:hover,
+html[data-ta-theme="light"] .dashboard .settings-card:hover{
+    box-shadow:0 16px 42px rgba(71,63,48,.12);
+}
+
+/* Better controls */
+button,input,textarea,select{font:inherit}
+button{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease,background .18s ease}
+button:not(:disabled):active{transform:translateY(1px) scale(.985)}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible{
+    outline:2px solid var(--ta-accent);
+    outline-offset:3px;
+}
+
+/* Scrollbar */
+*{
+    scrollbar-width:thin;
+    scrollbar-color:var(--ta-border-strong) transparent;
+}
+*::-webkit-scrollbar{width:8px;height:8px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{
+    background:linear-gradient(var(--ta-accent),var(--ta-accent-2));
+    border-radius:20px;
+    border:2px solid transparent;
+    background-clip:padding-box;
+}
+
+/* Top reading/progress line */
+#taScrollProgress{
+    position:fixed;
+    top:0;
+    left:0;
+    width:0%;
+    height:3px;
+    z-index:1000000;
+    background:linear-gradient(90deg,var(--ta-accent-2),var(--ta-accent),#6fffe9);
+    box-shadow:0 0 14px var(--ta-glow);
+    pointer-events:none;
+}
+
+/* Command palette */
+#taCommandPalette{
+    position:fixed;
+    inset:0;
+    z-index:999999;
+    display:none;
+    align-items:flex-start;
+    justify-content:center;
+    padding:10vh 18px 30px;
+    background:rgba(0,0,0,.52);
+    backdrop-filter:blur(12px);
+}
+#taCommandPalette.open{display:flex}
+.ta-cmd-box{
+    width:min(680px,100%);
+    overflow:hidden;
+    border:1px solid var(--ta-border-strong);
+    border-radius:22px;
+    background:var(--ta-card-solid);
+    box-shadow:0 30px 100px rgba(0,0,0,.5),0 0 50px var(--ta-glow);
+    animation:taCmdIn .18s ease both;
+}
+@keyframes taCmdIn{from{opacity:0;transform:translateY(-12px) scale(.98)}to{opacity:1;transform:none}}
+.ta-cmd-search{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:16px 18px;
+    border-bottom:1px solid var(--ta-border);
+}
+.ta-cmd-search span{color:var(--ta-muted)}
+.ta-cmd-search input{
+    flex:1;
+    border:0;
+    outline:0;
+    background:transparent;
+    color:var(--ta-text);
+    font-size:16px;
+}
+.ta-cmd-list{max-height:430px;overflow:auto;padding:8px}
+.ta-cmd-item{
+    width:100%;
+    display:flex;
+    align-items:center;
+    gap:13px;
+    padding:13px 14px;
+    border:0;
+    border-radius:13px;
+    background:transparent;
+    color:var(--ta-text-2);
+    text-align:left;
+    cursor:pointer;
+}
+.ta-cmd-item:hover,.ta-cmd-item.selected{
+    background:var(--ta-glow);
+    color:var(--ta-text);
+}
+.ta-cmd-icon{
+    width:32px;height:32px;border-radius:9px;
+    display:grid;place-items:center;
+    background:var(--ta-surface-2);
+    color:var(--ta-accent);
+}
+.ta-cmd-copy strong{display:block;font-size:13px}
+.ta-cmd-copy small{display:block;margin-top:2px;color:var(--ta-muted);font-size:10px}
+.ta-cmd-key{
+    margin-left:auto;
+    color:var(--ta-muted);
+    font-size:10px;
+    border:1px solid var(--ta-border);
+    border-radius:6px;
+    padding:3px 6px;
+}
+.ta-cmd-footer{
+    display:flex;
+    gap:15px;
+    padding:10px 14px;
+    border-top:1px solid var(--ta-border);
+    color:var(--ta-muted);
+    font-size:10px;
+}
+
+/* Better empty/loading states */
+.ta-skeleton{
+    position:relative;
+    overflow:hidden;
+    background:var(--ta-surface-2)!important;
+}
+.ta-skeleton::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    transform:translateX(-100%);
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);
+    animation:taShimmer 1.35s infinite;
+}
+@keyframes taShimmer{to{transform:translateX(100%)}}
+
+/* Toast refinement */
+.trueaegis-toast{
+    position:fixed!important;
+    right:22px!important;
+    bottom:22px!important;
+    z-index:1000001!important;
+    max-width:min(380px,calc(100vw - 32px));
+    padding:13px 16px!important;
+    border:1px solid var(--ta-border-strong)!important;
+    border-radius:14px!important;
+    background:var(--ta-card-solid)!important;
+    color:var(--ta-text)!important;
+    box-shadow:0 18px 55px rgba(0,0,0,.35),0 0 25px var(--ta-glow)!important;
+    backdrop-filter:blur(18px);
+    animation:taToastIn .24s ease both;
+}
+@keyframes taToastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* Light theme: deliberately cream/white, not icy blue */
+html[data-ta-theme="light"] body{
+    background:
+        radial-gradient(circle at 90% 5%,rgba(216,190,139,.16),transparent 30%),
+        linear-gradient(180deg,#fffdf8 0%,#f6f1e7 100%)!important;
+}
+html[data-ta-theme="light"] .sidebar{
+    background:rgba(255,253,248,.92)!important;
+    border-color:#ddd5c5!important;
+}
+html[data-ta-theme="light"] .sidebar button,
+html[data-ta-theme="light"] .sidebar a{color:#52616a!important}
+html[data-ta-theme="light"] .sidebar button.active,
+html[data-ta-theme="light"] .sidebar a.active{
+    color:#145d75!important;
+    background:rgba(8,127,169,.09)!important;
+}
+html[data-ta-theme="light"] .panel,
+html[data-ta-theme="light"] .card,
+html[data-ta-theme="light"] .stat-card,
+html[data-ta-theme="light"] .quick-card,
+html[data-ta-theme="light"] .tool-card,
+html[data-ta-theme="light"] .result-card,
+html[data-ta-theme="light"] .settings-card{
+    background:rgba(255,253,248,.88)!important;
+    border-color:#ded7c8!important;
+}
+html[data-ta-theme="light"] input,
+html[data-ta-theme="light"] textarea,
+html[data-ta-theme="light"] select{
+    background:#fff!important;
+    color:#1c2a31!important;
+    border-color:#d8d0c0!important;
+}
+html[data-ta-theme="light"] .muted,
+html[data-ta-theme="light"] small{color:#6f7779}
+html[data-ta-theme="light"] .verification-mode-switch{
+    background:#f4efe5!important;
+    border-color:#ddd5c5!important;
+}
+
+/* Black theme: true black, not charcoal */
+html[data-ta-theme="dark"] body{
+    background:#000!important;
+}
+html[data-ta-theme="dark"] .sidebar{
+    background:#000!important;
+    border-color:#171717!important;
+}
+html[data-ta-theme="dark"] .panel,
+html[data-ta-theme="dark"] .card,
+html[data-ta-theme="dark"] .stat-card,
+html[data-ta-theme="dark"] .quick-card,
+html[data-ta-theme="dark"] .tool-card,
+html[data-ta-theme="dark"] .result-card,
+html[data-ta-theme="dark"] .settings-card{
+    background:#070707!important;
+    border-color:#1b1b1b!important;
+}
+html[data-ta-theme="dark"] .sidebar button.active,
+html[data-ta-theme="dark"] .sidebar a.active{
+    background:#111!important;
+    color:#fff!important;
+    border-color:#292929!important;
+}
+
+/* Original cyber theme gets the strongest brand depth */
+html[data-ta-theme="cyber"] body{
+    background:
+        radial-gradient(circle at 80% 0%,rgba(0,217,255,.055),transparent 27%),
+        radial-gradient(circle at 15% 85%,rgba(40,120,255,.045),transparent 30%),
+        #03101a!important;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{
+        animation-duration:.001ms!important;
+        animation-iteration-count:1!important;
+        scroll-behavior:auto!important;
+        transition-duration:.001ms!important;
+    }
+}
+@media(max-width:900px){
+    .dashboard{grid-template-columns:1fr}
+    .dashboard.ta-sidebar-collapsed{grid-template-columns:1fr}
+    .ta-sidebar-toggle{display:none}
+}
+</style>
+<style>
+.dashboard .panel,
+.dashboard .card,
+.dashboard .stat-card,
+.dashboard .quick-card,
+.dashboard .tool-card,
+.dashboard .result-card,
+.dashboard .settings-card{
+    position:relative;
+    overflow:hidden;
+}
+.dashboard .panel::after,
+.dashboard .card::after,
+.dashboard .stat-card::after,
+.dashboard .quick-card::after,
+.dashboard .tool-card::after,
+.dashboard .result-card::after,
+.dashboard .settings-card::after{
+    content:"";
+    position:absolute;
+    width:180px;height:180px;
+    left:calc(var(--mx,50%) - 90px);
+    top:calc(var(--my,50%) - 90px);
+    border-radius:50%;
+    pointer-events:none;
+    opacity:0;
+    background:radial-gradient(circle,var(--ta-glow),transparent 68%);
+    transition:opacity .2s ease;
+}
+.dashboard .panel:hover::after,
+.dashboard .card:hover::after,
+.dashboard .stat-card:hover::after,
+.dashboard .quick-card:hover::after,
+.dashboard .tool-card:hover::after,
+.dashboard .result-card:hover::after,
+.dashboard .settings-card:hover::after{opacity:1}
+</style>
+<style id="trueaegis-theme-bridge">
+:root{
+ --ta-accent:#00d9ff;--ta-accent-2:#2878ff;--ta-glow:rgba(0,217,255,.13);
+ --ta-text:#f3f8fc;--ta-text-2:#c6d5df;--ta-muted:#8295a4;
+ --ta-border:rgba(140,180,205,.14);--ta-border-strong:rgba(0,217,255,.35);
+ --ta-surface:rgba(7,18,28,.82);--ta-surface-2:rgba(12,26,39,.82);--ta-card-solid:#08131d;
+}
+html[data-ta-theme="dark"]{
+ --ta-accent:#62dfff;--ta-accent-2:#4388ff;--ta-glow:rgba(98,223,255,.09);
+ --ta-text:#f5f7f8;--ta-text-2:#c7ced2;--ta-muted:#858b8f;
+ --ta-border:#1c1c1c;--ta-border-strong:#343434;--ta-surface:#080808;--ta-surface-2:#101010;--ta-card-solid:#070707;
+}
+html[data-ta-theme="light"]{
+ --ta-accent:#087fa9;--ta-accent-2:#2563a6;--ta-glow:rgba(8,127,169,.08);
+ --ta-text:#1b2a31;--ta-text-2:#46565d;--ta-muted:#727a7c;
+ --ta-border:#ded7c8;--ta-border-strong:#b9af9e;--ta-surface:#fffdf8;--ta-surface-2:#f4efe5;--ta-card-solid:#fffdf8;
+}
+</style>
+
+</head><body><h1>TrueAegis Verification Report</h1><div class="meta">${escapeHtml(trueAegisLastFileName)} · ${new Date().toLocaleString()}</div><h2>Overall Assessment</h2><p>${escapeHtml(r.summary || r.verdict || 'Inconclusive')}</p><h2>Suspicion Level</h2><p>${escapeHtml(r.suspicionLevel || 'Unknown')} · Confidence ${escapeHtml(r.confidence ?? 0)}%</p><h2>Evidence</h2><ul>${list(r.evidence)}</ul><h2>Limitations</h2><ul>${list(r.limitations)}</ul><h2>Verification Steps</h2><ul>${list(r.verificationSteps)}</ul><p><strong>Notice:</strong> AI assessment is not definitive proof. Independently verify important findings.</p></body></html>`); w.document.close(); setTimeout(()=>w.print(),250); }
 
         initializeTrueAegisAppearance();
 
@@ -11051,6 +11476,174 @@ Clearly distinguish:
         applyDragonMotionState();
 
     </script>
+
+
+<script id="trueaegis-elite-js">
+(() => {
+    const bar = document.createElement('div');
+    bar.id = 'taScrollProgress';
+    document.body.appendChild(bar);
+    const updateScroll = () => {
+        const d = document.documentElement;
+        const max = d.scrollHeight - d.clientHeight;
+        bar.style.width = `${max > 0 ? (window.scrollY / max) * 100 : 0}%`;
+    };
+    addEventListener('scroll', updateScroll, {passive:true});
+    addEventListener('resize', updateScroll);
+    updateScroll();
+
+    const dashboard = document.querySelector('.dashboard');
+    const sidebar = document.querySelector('.sidebar');
+    if (dashboard && sidebar && !document.querySelector('.ta-sidebar-toggle')) {
+        const toggle = document.createElement('button');
+        toggle.className = 'ta-sidebar-toggle';
+        toggle.type = 'button';
+        toggle.title = 'Collapse sidebar';
+        toggle.setAttribute('aria-label','Collapse sidebar');
+        toggle.textContent = '‹';
+        sidebar.appendChild(toggle);
+        const saved = localStorage.getItem('trueAegisSidebarCollapsed') === '1';
+        if (saved) {
+            dashboard.classList.add('ta-sidebar-collapsed');
+            toggle.textContent = '›';
+            toggle.title = 'Expand sidebar';
+            toggle.setAttribute('aria-label','Expand sidebar');
+        }
+        toggle.addEventListener('click', () => {
+            const collapsed = dashboard.classList.toggle('ta-sidebar-collapsed');
+            localStorage.setItem('trueAegisSidebarCollapsed', collapsed ? '1' : '0');
+            toggle.textContent = collapsed ? '›' : '‹';
+            toggle.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+            toggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+        });
+    }
+
+    const findAndActivate = (patterns) => {
+        const nodes = [...document.querySelectorAll('button,a,[role="button"]')];
+        const node = nodes.find(el => {
+            const t = (el.textContent || '').trim().toLowerCase();
+            const a = (el.getAttribute('aria-label') || '').toLowerCase();
+            const h = (el.getAttribute('href') || '').toLowerCase();
+            return patterns.some(p => t.includes(p) || a.includes(p) || h.includes(p));
+        });
+        if (node) { node.click(); return true; }
+        return false;
+    };
+
+    const actions = [
+        {icon:'◈',name:'Deepfake Analysis',desc:'Analyze potentially manipulated media',keys:'1',run:()=>findAndActivate(['deepfake analysis','media analysis'])},
+        {icon:'✓',name:'Content Verification',desc:'Verify claims and submitted content',keys:'2',run:()=>findAndActivate(['content verification'])},
+        {icon:'⌁',name:'News Analysis',desc:'Investigate news and information',keys:'3',run:()=>findAndActivate(['news analysis'])},
+        {icon:'✦',name:'Aegis Assistant',desc:'Open the AI assistant workspace',keys:'4',run:()=>findAndActivate(['aegis assistant','ai assistant','ai chatbot'])},
+        {icon:'⚙',name:'Settings',desc:'Appearance and account settings',keys:'5',run:()=>findAndActivate(['settings'])}
+    ];
+
+    const palette = document.createElement('div');
+    palette.id = 'taCommandPalette';
+    palette.innerHTML = `
+      <div class="ta-cmd-box" role="dialog" aria-modal="true" aria-label="TrueAegis command palette">
+        <div class="ta-cmd-search"><span>⌘</span><input id="taCmdInput" autocomplete="off" placeholder="Search workspace, settings, or actions…"></div>
+        <div class="ta-cmd-list" id="taCmdList"></div>
+        <div class="ta-cmd-footer"><span>↑↓ Navigate</span><span>Enter Select</span><span>Esc Close</span></div>
+      </div>`;
+    document.body.appendChild(palette);
+
+    const input = palette.querySelector('#taCmdInput');
+    const list = palette.querySelector('#taCmdList');
+    let selected = 0;
+
+    function renderActions(filter='') {
+        const q = filter.trim().toLowerCase();
+        const visible = actions.filter(a => `${a.name} ${a.desc}`.toLowerCase().includes(q));
+        selected = Math.min(selected, Math.max(0, visible.length - 1));
+        list.innerHTML = visible.map((a,i) => `
+          <button class="ta-cmd-item ${i===selected?'selected':''}" data-index="${actions.indexOf(a)}">
+            <span class="ta-cmd-icon">${a.icon}</span>
+            <span class="ta-cmd-copy"><strong>${a.name}</strong><small>${a.desc}</small></span>
+            <span class="ta-cmd-key">${a.keys}</span>
+          </button>`).join('');
+        list.querySelectorAll('.ta-cmd-item').forEach(btn => {
+            btn.onclick = () => {
+                const a = actions[Number(btn.dataset.index)];
+                closePalette();
+                setTimeout(() => a.run?.(), 50);
+            };
+        });
+    }
+    function openPalette() {
+        palette.classList.add('open');
+        input.value = '';
+        selected = 0;
+        renderActions();
+        setTimeout(() => input.focus(), 30);
+    }
+    function closePalette() { palette.classList.remove('open'); }
+
+    input.addEventListener('input', () => { selected = 0; renderActions(input.value); });
+    palette.addEventListener('click', e => { if (e.target === palette) closePalette(); });
+    input.addEventListener('keydown', e => {
+        const items = [...list.querySelectorAll('.ta-cmd-item')];
+        if (e.key === 'ArrowDown') { e.preventDefault(); selected = Math.min(selected + 1, items.length - 1); renderActions(input.value); }
+        if (e.key === 'ArrowUp') { e.preventDefault(); selected = Math.max(selected - 1, 0); renderActions(input.value); }
+        if (e.key === 'Enter' && items[selected]) items[selected].click();
+        if (e.key === 'Escape') closePalette();
+    });
+    document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            palette.classList.contains('open') ? closePalette() : openPalette();
+        }
+    });
+    window.openTrueAegisCommandPalette = openPalette;
+
+    document.addEventListener('pointermove', e => {
+        const card = e.target.closest('.panel,.card,.stat-card,.quick-card,.tool-card,.result-card,.settings-card');
+        if (!card) return;
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', `${e.clientX-r.left}px`);
+        card.style.setProperty('--my', `${e.clientY-r.top}px`);
+    }, {passive:true});
+})();
+</script>
+
+<script id="trueaegis-final-runtime-check">
+(() => {
+    const root = document.documentElement;
+    const syncTheme = () => {
+        const raw = (root.getAttribute('data-theme') || root.getAttribute('data-ta-theme') ||
+            localStorage.getItem('trueAegisTheme') || localStorage.getItem('theme') || '').toLowerCase();
+        const mode = raw.includes('light') || raw.includes('cream') ? 'light' :
+                     raw.includes('dark') || raw.includes('black') ? 'dark' : 'cyber';
+        root.setAttribute('data-ta-theme', mode);
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.content = mode === 'light' ? '#fffdf8' : mode === 'dark' ? '#000000' : '#03101a';
+    };
+    syncTheme();
+    new MutationObserver(syncTheme).observe(root,{attributes:true,attributeFilter:['data-theme','data-ta-theme']});
+
+    document.addEventListener('click', e => {
+        const link = e.target.closest('a[href^="#"]');
+        if (!link) return;
+        const hash = link.getAttribute('href');
+        if (!hash || hash === '#') return;
+        const target = document.querySelector(hash);
+        if (!target) return;
+        e.preventDefault();
+        target.scrollIntoView({behavior:'smooth',block:'start'});
+        history.replaceState(null,'',hash);
+    }, true);
+
+    const splash = document.getElementById('trueAegisSplash');
+    if (splash) {
+        setTimeout(() => {
+            if (!splash.classList.contains('splash-hidden')) {
+                splash.classList.add('splash-hidden');
+                splash.setAttribute('aria-hidden','true');
+            }
+        }, 18000);
+    }
+})();
+</script>
 
 </body>
 
