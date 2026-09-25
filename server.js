@@ -2368,9 +2368,6 @@ app.get(
 
     const pages = [
       "",
-      "/login",
-      "/register",
-      "/dashboard",
       "/services",
       "/security",
       "/dragon"
