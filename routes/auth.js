@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
 const { OAuth2Client } = require("google-auth-library");
 const User = require("../modules/user");
 
@@ -13,7 +14,6 @@ const router = express.Router();
 
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
 const RESET_EXPIRY_MS = 15 * 60 * 1000;
-
 const COOKIE_NAME = "trueaegis_token";
 
 const BASE_URL = String(
@@ -36,19 +36,25 @@ const JWT_SECRET =
     process.env.JWT_SECRET || "";
 
 /* ============================================================
-   RESEND EMAIL CONFIGURATION
+   GMAIL CONFIGURATION
 ============================================================ */
 
-const RESEND_API_KEY =
-    process.env.RESEND_API_KEY || "";
+const GMAIL_USER =
+    process.env.GMAIL_USER || "";
 
-const RESEND_FROM_EMAIL =
-    process.env.RESEND_FROM_EMAIL ||
-    "onboarding@resend.dev";
+const GMAIL_APP_PASSWORD =
+    process.env.GMAIL_APP_PASSWORD || "";
 
-const RESEND_FROM_NAME =
-    process.env.RESEND_FROM_NAME ||
-    "TrueAegis";
+const gmailTransporter =
+    GMAIL_USER && GMAIL_APP_PASSWORD
+        ? nodemailer.createTransport({
+              service: "gmail",
+              auth: {
+                  user: GMAIL_USER,
+                  pass: GMAIL_APP_PASSWORD
+              }
+          })
+        : null;
 
 /* ============================================================
    GOOGLE CLIENT
@@ -56,12 +62,11 @@ const RESEND_FROM_NAME =
 
 const googleClient = GOOGLE_CLIENT_ID
     ? new OAuth2Client(
-        GOOGLE_CLIENT_ID,
-        GOOGLE_CLIENT_SECRET || undefined,
-        GOOGLE_REDIRECT_URI
-    )
+          GOOGLE_CLIENT_ID,
+          GOOGLE_CLIENT_SECRET || undefined,
+          GOOGLE_REDIRECT_URI
+      )
     : null;
-
 
 /* ============================================================
    HELPERS
@@ -73,16 +78,15 @@ function normalizeEmail(email) {
         .toLowerCase();
 }
 
-
-function generateOTP() {
-    return String(
-        Math.floor(
-            100000 +
-            Math.random() * 900000
-        )
-    );
+function isGmailAddress(email) {
+    return /^[^\s@]+@gmail\.com$/i.test(email);
 }
 
+function generateOTP() {
+    return crypto
+        .randomInt(100000, 1000000)
+        .toString();
+}
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -92,7 +96,6 @@ function escapeHtml(value) {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
 }
-
 
 function publicUser(user) {
     return {
@@ -106,12 +109,10 @@ function publicUser(user) {
     };
 }
 
-
 function getCookieOptions(maxAge) {
     const options = {
         httpOnly: true,
-        secure:
-            process.env.NODE_ENV === "production",
+        secure: BASE_URL.startsWith("https://"),
         sameSite: "lax",
         path: "/"
     };
@@ -123,11 +124,7 @@ function getCookieOptions(maxAge) {
     return options;
 }
 
-
-function createToken(
-    user,
-    rememberMe = false
-) {
+function createToken(user, rememberMe = false) {
     if (!JWT_SECRET) {
         throw new Error(
             "JWT_SECRET is not configured."
@@ -140,37 +137,26 @@ function createToken(
         },
         JWT_SECRET,
         {
-            expiresIn:
-                rememberMe
-                    ? "30d"
-                    : "1d"
+            expiresIn: rememberMe
+                ? "30d"
+                : "1d"
         }
     );
 }
-
 
 function setLoginCookie(
     res,
     user,
     rememberMe = false
 ) {
-    const token =
-        createToken(
-            user,
-            rememberMe
-        );
-
-    const maxAge =
+    const token = createToken(
+        user,
         rememberMe
-            ? 30 *
-              24 *
-              60 *
-              60 *
-              1000
-            : 24 *
-              60 *
-              60 *
-              1000;
+    );
+
+    const maxAge = rememberMe
+        ? 30 * 24 * 60 * 60 * 1000
+        : 24 * 60 * 60 * 1000;
 
     res.cookie(
         COOKIE_NAME,
@@ -178,7 +164,6 @@ function setLoginCookie(
         getCookieOptions(maxAge)
     );
 }
-
 
 /* ============================================================
    AUTH MIDDLEWARE
@@ -199,9 +184,7 @@ async function requireAuth(
         }
 
         const token =
-            req.cookies?.[
-                COOKIE_NAME
-            ];
+            req.cookies?.[COOKIE_NAME];
 
         if (!token) {
             return res.status(401).json({
@@ -231,11 +214,9 @@ async function requireAuth(
         }
 
         req.user = user;
-
         next();
 
     } catch (error) {
-
         return res.status(401).json({
             success: false,
             message:
@@ -244,9 +225,8 @@ async function requireAuth(
     }
 }
 
-
 /* ============================================================
-   EMAIL — RESEND API
+   GMAIL EMAIL SENDER
 ============================================================ */
 
 async function sendEmail(
@@ -254,74 +234,62 @@ async function sendEmail(
     subject,
     html
 ) {
-    if (!RESEND_API_KEY) {
+    if (!GMAIL_USER) {
         throw new Error(
-            "Resend email service is not configured."
+            "GMAIL_USER is not configured."
         );
     }
 
-    const response =
-        await fetch(
-            "https://api.resend.com/emails",
-            {
-                method: "POST",
-
-                headers: {
-                    "Content-Type":
-                        "application/json",
-
-                    "Authorization":
-                        `Bearer ${RESEND_API_KEY}`
-                },
-
-                body: JSON.stringify({
-                    from:
-                        `${RESEND_FROM_NAME} <${RESEND_FROM_EMAIL}>`,
-
-                    to: [to],
-
-                    subject,
-
-                    html
-                })
-            }
+    if (!GMAIL_APP_PASSWORD) {
+        throw new Error(
+            "GMAIL_APP_PASSWORD is not configured."
         );
+    }
 
-    let data = null;
+    if (!gmailTransporter) {
+        throw new Error(
+            "Gmail email service is not configured."
+        );
+    }
 
     try {
-        data =
-            await response.json();
-    } catch {
-        data = null;
+        const result =
+            await gmailTransporter.sendMail({
+                from: `"TrueAegis" <${GMAIL_USER}>`,
+                to,
+                subject,
+                html,
+                text:
+                    "This email was sent by TrueAegis."
+            });
+
+        console.log(
+            "Gmail email sent successfully:",
+            result.messageId
+        );
+
+        return result;
+
+    } catch (error) {
+        console.error(
+            "Gmail sending error:",
+            error.message
+        );
+
+        throw new Error(
+            `Gmail email could not be sent: ${error.message}`
+        );
     }
-
-    if (!response.ok) {
-
-        const message =
-            data?.message ||
-            data?.error?.message ||
-            `Resend API returned HTTP ${response.status}.`;
-
-        throw new Error(message);
-    }
-
-    return data;
 }
-
 
 /* ============================================================
    VERIFICATION EMAIL
 ============================================================ */
 
-async function sendVerificationEmail(
-    user
-) {
+async function sendVerificationEmail(user) {
     await sendEmail(
         user.email,
-
         "TrueAegis - Verify your email",
-
         `
         <div
             style="
@@ -333,23 +301,16 @@ async function sendVerificationEmail(
             "
         >
 
-            <h2
-                style="
-                    color:#0f172a;
-                "
-            >
+            <h2 style="color:#0f172a;">
                 Welcome to TrueAegis
             </h2>
 
             <p>
-                Hello ${escapeHtml(
-                    user.fullName
-                )},
+                Hello ${escapeHtml(user.fullName)},
             </p>
 
             <p>
-                Your TrueAegis verification
-                code is:
+                Your TrueAegis verification code is:
             </p>
 
             <div
@@ -364,9 +325,7 @@ async function sendVerificationEmail(
                     text-align:center;
                 "
             >
-                ${escapeHtml(
-                    user.otp
-                )}
+                ${escapeHtml(user.otp)}
             </div>
 
             <p>
@@ -375,9 +334,8 @@ async function sendVerificationEmail(
             </p>
 
             <p>
-                If you did not create this
-                account, you can safely ignore
-                this email.
+                If you did not create this account,
+                you can safely ignore this email.
             </p>
 
             <hr
@@ -394,15 +352,13 @@ async function sendVerificationEmail(
                     color:#64748b;
                 "
             >
-                TrueAegis — Digital Trust
-                Intelligence
+                TrueAegis — Digital Trust Intelligence
             </p>
 
         </div>
         `
     );
 }
-
 
 /* ============================================================
    PASSWORD RESET EMAIL
@@ -419,9 +375,7 @@ async function sendResetEmail(
 
     await sendEmail(
         user.email,
-
         "TrueAegis - Reset your password",
-
         `
         <div
             style="
@@ -433,18 +387,12 @@ async function sendResetEmail(
             "
         >
 
-            <h2
-                style="
-                    color:#0f172a;
-                "
-            >
+            <h2 style="color:#0f172a;">
                 Reset your TrueAegis password
             </h2>
 
             <p>
-                Hello ${escapeHtml(
-                    user.fullName
-                )},
+                Hello ${escapeHtml(user.fullName)},
             </p>
 
             <p>
@@ -463,7 +411,6 @@ async function sendResetEmail(
                     text-align:center;
                 "
             >
-
                 <a
                     href="${resetUrl}"
                     style="
@@ -478,7 +425,6 @@ async function sendResetEmail(
                 >
                     Reset Password
                 </a>
-
             </p>
 
             <p>
@@ -506,15 +452,13 @@ async function sendResetEmail(
                     color:#64748b;
                 "
             >
-                TrueAegis — Digital Trust
-                Intelligence
+                TrueAegis — Digital Trust Intelligence
             </p>
 
         </div>
         `
     );
 }
-
 
 /* ============================================================
    HEALTH
@@ -523,10 +467,8 @@ async function sendResetEmail(
 router.get(
     "/health",
     (req, res) => {
-
         res.json({
             success: true,
-
             service:
                 "TrueAegis Authentication",
 
@@ -540,8 +482,12 @@ router.get(
 
             emailService:
                 Boolean(
-                    RESEND_API_KEY
+                    GMAIL_USER &&
+                    GMAIL_APP_PASSWORD
                 ),
+
+            emailProvider:
+                "Gmail SMTP",
 
             jwt:
                 Boolean(
@@ -551,7 +497,6 @@ router.get(
     }
 );
 
-
 /* ============================================================
    REGISTER
 ============================================================ */
@@ -559,38 +504,33 @@ router.get(
 router.post(
     "/register",
     async (req, res) => {
-
         try {
+            const body = req.body || {};
 
             const fullName =
                 String(
-                    req.body.fullName ||
-                    ""
+                    body.fullName || ""
                 ).trim();
 
             const email =
                 normalizeEmail(
-                    req.body.email
+                    body.email
                 );
 
             const password =
                 String(
-                    req.body.password ||
-                    ""
+                    body.password || ""
                 );
 
             const age =
-                Number(
-                    req.body.age
-                );
+                Number(body.age);
 
             const language =
                 String(
-                    req.body.language ||
+                    body.language ||
                     "English"
                 ).trim() ||
                 "English";
-
 
             if (!fullName) {
                 return res.status(400).json({
@@ -600,12 +540,15 @@ router.post(
                 });
             }
 
+            if (fullName.length < 2) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Please enter your full name."
+                });
+            }
 
-            if (
-                !/^[^\s@]+@gmail\.com$/i.test(
-                    email
-                )
-            ) {
+            if (!isGmailAddress(email)) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -613,10 +556,7 @@ router.post(
                 });
             }
 
-
-            if (
-                password.length < 8
-            ) {
+            if (password.length < 8) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -624,6 +564,13 @@ router.post(
                 });
             }
 
+            if (password.length > 128) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Password is too long."
+                });
+            }
 
             if (
                 !Number.isInteger(age) ||
@@ -636,16 +583,13 @@ router.post(
                 });
             }
 
-
             let user =
                 await User.findOne({
                     email
                 });
 
-
             const otp =
                 generateOTP();
-
 
             const otpExpires =
                 new Date(
@@ -653,13 +597,11 @@ router.post(
                     OTP_EXPIRY_MS
                 );
 
-
             const hashedPassword =
                 await bcrypt.hash(
                     password,
                     12
                 );
-
 
             if (user) {
 
@@ -670,7 +612,6 @@ router.post(
                             "An account with this email already exists."
                     });
                 }
-
 
                 user.fullName =
                     fullName;
@@ -713,7 +654,6 @@ router.post(
                     });
             }
 
-
             try {
 
                 await sendVerificationEmail(
@@ -734,7 +674,6 @@ router.post(
                 });
             }
 
-
             return res.status(201).json({
                 success: true,
                 message:
@@ -742,7 +681,6 @@ router.post(
                 email:
                     user.email
             });
-
 
         } catch (error) {
 
@@ -760,7 +698,6 @@ router.post(
     }
 );
 
-
 /* ============================================================
    VERIFY OTP
 ============================================================ */
@@ -768,25 +705,20 @@ router.post(
 router.post(
     "/verify-otp",
     async (req, res) => {
-
         try {
+            const body = req.body || {};
 
             const email =
                 normalizeEmail(
-                    req.body.email
+                    body.email
                 );
 
             const otp =
                 String(
-                    req.body.otp ||
-                    ""
+                    body.otp || ""
                 ).trim();
 
-
-            if (
-                !email ||
-                !otp
-            ) {
+            if (!email || !otp) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -794,12 +726,10 @@ router.post(
                 });
             }
 
-
             const user =
                 await User.findOne({
                     email
                 });
-
 
             if (!user) {
                 return res.status(404).json({
@@ -809,7 +739,6 @@ router.post(
                 });
             }
 
-
             if (user.verified) {
                 return res.json({
                     success: true,
@@ -817,7 +746,6 @@ router.post(
                         "Email is already verified."
                 });
             }
-
 
             if (
                 !user.otp ||
@@ -830,7 +758,6 @@ router.post(
                 });
             }
 
-
             if (
                 Date.now() >
                 user.otpExpires.getTime()
@@ -842,10 +769,7 @@ router.post(
                 });
             }
 
-
-            if (
-                user.otp !== otp
-            ) {
+            if (user.otp !== otp) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -853,19 +777,11 @@ router.post(
                 });
             }
 
-
-            user.verified =
-                true;
-
-            user.otp =
-                null;
-
-            user.otpExpires =
-                null;
-
+            user.verified = true;
+            user.otp = null;
+            user.otpExpires = null;
 
             await user.save();
-
 
             return res.json({
                 success: true,
@@ -874,7 +790,6 @@ router.post(
                 user:
                     publicUser(user)
             });
-
 
         } catch (error) {
 
@@ -892,7 +807,6 @@ router.post(
     }
 );
 
-
 /* ============================================================
    RESEND OTP
 ============================================================ */
@@ -900,14 +814,11 @@ router.post(
 router.post(
     "/resend-otp",
     async (req, res) => {
-
         try {
-
             const email =
                 normalizeEmail(
-                    req.body.email
+                    req.body?.email
                 );
-
 
             if (!email) {
                 return res.status(400).json({
@@ -917,12 +828,10 @@ router.post(
                 });
             }
 
-
             const user =
                 await User.findOne({
                     email
                 });
-
 
             if (!user) {
                 return res.status(404).json({
@@ -932,7 +841,6 @@ router.post(
                 });
             }
 
-
             if (user.verified) {
                 return res.status(400).json({
                     success: false,
@@ -940,7 +848,6 @@ router.post(
                         "This account is already verified."
                 });
             }
-
 
             user.otp =
                 generateOTP();
@@ -951,9 +858,7 @@ router.post(
                     OTP_EXPIRY_MS
                 );
 
-
             await user.save();
-
 
             try {
 
@@ -975,13 +880,11 @@ router.post(
                 });
             }
 
-
             return res.json({
                 success: true,
                 message:
                     "A new verification code has been sent."
             });
-
 
         } catch (error) {
 
@@ -999,7 +902,6 @@ router.post(
     }
 );
 
-
 /* ============================================================
    LOGIN
 ============================================================ */
@@ -1007,30 +909,35 @@ router.post(
 router.post(
     "/login",
     async (req, res) => {
-
         try {
+            const body = req.body || {};
 
             const email =
                 normalizeEmail(
-                    req.body.email
+                    body.email
                 );
 
             const password =
                 String(
-                    req.body.password ||
-                    ""
+                    body.password || ""
                 );
 
             const rememberMe =
-                req.body.rememberMe === true ||
-                req.body.rememberMe === "true";
+                body.rememberMe === true ||
+                body.rememberMe === "true";
 
+            if (!email || !password) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Email and password are required."
+                });
+            }
 
             const user =
                 await User.findOne({
                     email
                 });
-
 
             if (!user) {
                 return res.status(401).json({
@@ -1039,7 +946,6 @@ router.post(
                         "Invalid email or password."
                 });
             }
-
 
             if (
                 user.authProvider ===
@@ -1053,7 +959,6 @@ router.post(
                 });
             }
 
-
             if (!user.password) {
                 return res.status(401).json({
                     success: false,
@@ -1062,13 +967,11 @@ router.post(
                 });
             }
 
-
             const passwordCorrect =
                 await bcrypt.compare(
                     password,
                     user.password
                 );
-
 
             if (!passwordCorrect) {
                 return res.status(401).json({
@@ -1078,7 +981,6 @@ router.post(
                 });
             }
 
-
             if (!user.verified) {
                 return res.status(403).json({
                     success: false,
@@ -1087,13 +989,11 @@ router.post(
                 });
             }
 
-
             setLoginCookie(
                 res,
                 user,
                 rememberMe
             );
-
 
             return res.json({
                 success: true,
@@ -1102,7 +1002,6 @@ router.post(
                 user:
                     publicUser(user)
             });
-
 
         } catch (error) {
 
@@ -1120,7 +1019,6 @@ router.post(
     }
 );
 
-
 /* ============================================================
    GOOGLE OAUTH START
 ============================================================ */
@@ -1128,9 +1026,7 @@ router.post(
 router.get(
     "/google",
     (req, res) => {
-
         try {
-
             if (
                 !googleClient ||
                 !GOOGLE_CLIENT_ID
@@ -1140,15 +1036,10 @@ router.get(
                 );
             }
 
-
             const authUrl =
                 googleClient.generateAuthUrl({
-                    access_type:
-                        "offline",
-
-                    prompt:
-                        "select_account",
-
+                    access_type: "offline",
+                    prompt: "select_account",
                     scope: [
                         "openid",
                         "email",
@@ -1156,11 +1047,9 @@ router.get(
                     ]
                 });
 
-
             return res.redirect(
                 authUrl
             );
-
 
         } catch (error) {
 
@@ -1176,7 +1065,6 @@ router.get(
     }
 );
 
-
 /* ============================================================
    GOOGLE OAUTH CALLBACK
 ============================================================ */
@@ -1184,9 +1072,7 @@ router.get(
 router.get(
     "/google/callback",
     async (req, res) => {
-
         try {
-
             if (
                 !googleClient ||
                 !GOOGLE_CLIENT_ID
@@ -1196,33 +1082,16 @@ router.get(
                 );
             }
 
-
-            const errorParam =
-                String(
-                    req.query?.error ||
-                    ""
-                ).trim();
-
-
-            if (errorParam) {
-
-                console.error(
-                    "Google OAuth returned error:",
-                    errorParam
-                );
-
+            if (req.query?.error) {
                 return res.redirect(
                     "/?google=error&message=Google+Login+was+cancelled+or+denied."
                 );
             }
 
-
             const code =
                 String(
-                    req.query?.code ||
-                    ""
+                    req.query?.code || ""
                 ).trim();
-
 
             if (!code) {
                 return res.redirect(
@@ -1230,12 +1099,10 @@ router.get(
                 );
             }
 
-
             const { tokens } =
                 await googleClient.getToken(
                     code
                 );
-
 
             if (!tokens?.id_token) {
                 throw new Error(
@@ -1243,20 +1110,16 @@ router.get(
                 );
             }
 
-
             const ticket =
                 await googleClient.verifyIdToken({
                     idToken:
                         tokens.id_token,
-
                     audience:
                         GOOGLE_CLIENT_ID
                 });
 
-
             const payload =
                 ticket.getPayload();
-
 
             if (
                 !payload ||
@@ -1268,18 +1131,21 @@ router.get(
                 );
             }
 
-
             const email =
                 normalizeEmail(
                     payload.email
                 );
 
+            if (!isGmailAddress(email)) {
+                return res.redirect(
+                    "/?google=error&message=Please+use+a+Gmail+account."
+                );
+            }
 
             let user =
                 await User.findOne({
                     email
                 });
-
 
             if (!user) {
 
@@ -1319,23 +1185,19 @@ router.get(
                     );
                 }
 
-
                 user.googleId =
                     payload.sub;
 
                 user.verified =
                     true;
 
-
                 if (!user.password) {
                     user.authProvider =
                         "google";
                 }
 
-
                 await user.save();
             }
-
 
             setLoginCookie(
                 res,
@@ -1343,11 +1205,9 @@ router.get(
                 true
             );
 
-
             return res.redirect(
                 "/?google=success"
             );
-
 
         } catch (error) {
 
@@ -1363,7 +1223,6 @@ router.get(
     }
 );
 
-
 /* ============================================================
    GOOGLE LOGIN — CREDENTIAL MODE
 ============================================================ */
@@ -1371,9 +1230,7 @@ router.get(
 router.post(
     "/google",
     async (req, res) => {
-
         try {
-
             if (!googleClient) {
                 return res.status(503).json({
                     success: false,
@@ -1382,10 +1239,8 @@ router.post(
                 });
             }
 
-
             const credential =
-                req.body.credential;
-
+                req.body?.credential;
 
             if (!credential) {
                 return res.status(400).json({
@@ -1395,20 +1250,16 @@ router.post(
                 });
             }
 
-
             const ticket =
                 await googleClient.verifyIdToken({
                     idToken:
                         credential,
-
                     audience:
                         GOOGLE_CLIENT_ID
                 });
 
-
             const payload =
                 ticket.getPayload();
-
 
             if (
                 !payload ||
@@ -1422,18 +1273,23 @@ router.post(
                 });
             }
 
-
             const email =
                 normalizeEmail(
                     payload.email
                 );
 
+            if (!isGmailAddress(email)) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Please use a Gmail account."
+                });
+            }
 
             let user =
                 await User.findOne({
                     email
                 });
-
 
             if (!user) {
 
@@ -1475,35 +1331,29 @@ router.post(
                     });
                 }
 
-
                 user.googleId =
                     payload.sub;
 
                 user.verified =
                     true;
 
-
                 if (!user.password) {
                     user.authProvider =
                         "google";
                 }
 
-
                 await user.save();
             }
-
 
             const rememberMe =
                 req.body.rememberMe === true ||
                 req.body.rememberMe === "true";
-
 
             setLoginCookie(
                 res,
                 user,
                 rememberMe
             );
-
 
             return res.json({
                 success: true,
@@ -1512,7 +1362,6 @@ router.post(
                 user:
                     publicUser(user)
             });
-
 
         } catch (error) {
 
@@ -1530,7 +1379,6 @@ router.post(
     }
 );
 
-
 /* ============================================================
    CURRENT USER
 ============================================================ */
@@ -1539,7 +1387,6 @@ router.get(
     "/me",
     requireAuth,
     async (req, res) => {
-
         return res.json({
             success: true,
             user:
@@ -1550,7 +1397,6 @@ router.get(
     }
 );
 
-
 /* ============================================================
    CHECK EMAIL
 ============================================================ */
@@ -1558,14 +1404,11 @@ router.get(
 router.post(
     "/check-email",
     async (req, res) => {
-
         try {
-
             const email =
                 normalizeEmail(
-                    req.body.email
+                    req.body?.email
                 );
-
 
             if (!email) {
                 return res.status(400).json({
@@ -1575,29 +1418,23 @@ router.post(
                 });
             }
 
-
             const user =
                 await User.findOne({
                     email
                 });
 
-
             return res.json({
                 success: true,
-
                 exists:
                     Boolean(user),
-
                 verified:
                     Boolean(
                         user?.verified
                     ),
-
                 authProvider:
                     user?.authProvider ||
                     null
             });
-
 
         } catch (error) {
 
@@ -1615,7 +1452,6 @@ router.post(
     }
 );
 
-
 /* ============================================================
    FORGOT PASSWORD
 ============================================================ */
@@ -1623,25 +1459,17 @@ router.post(
 router.post(
     "/forgot-password",
     async (req, res) => {
-
         try {
-
             const email =
                 normalizeEmail(
-                    req.body.email
+                    req.body?.email
                 );
-
 
             const user =
                 await User.findOne({
                     email
                 });
 
-
-            /*
-             * Do not reveal whether an email
-             * exists in the database.
-             */
             if (!user) {
                 return res.json({
                     success: true,
@@ -1649,7 +1477,6 @@ router.post(
                         "If an account exists with that email, a reset link has been sent."
                 });
             }
-
 
             if (
                 user.authProvider ===
@@ -1663,16 +1490,13 @@ router.post(
                 });
             }
 
-
             const resetToken =
                 crypto
                     .randomBytes(32)
                     .toString("hex");
 
-
             user.resetPasswordToken =
                 resetToken;
-
 
             user.resetPasswordExpires =
                 new Date(
@@ -1680,9 +1504,7 @@ router.post(
                     RESET_EXPIRY_MS
                 );
 
-
             await user.save();
-
 
             try {
 
@@ -1701,12 +1523,10 @@ router.post(
 
                 await user.save();
 
-
                 console.error(
                     "Password reset email failed:",
                     emailError.message
                 );
-
 
                 return res.status(503).json({
                     success: false,
@@ -1715,13 +1535,11 @@ router.post(
                 });
             }
 
-
             return res.json({
                 success: true,
                 message:
                     "If an account exists with that email, a reset link has been sent."
             });
-
 
         } catch (error) {
 
@@ -1739,7 +1557,6 @@ router.post(
     }
 );
 
-
 /* ============================================================
    RESET PASSWORD
 ============================================================ */
@@ -1747,27 +1564,18 @@ router.post(
 router.post(
     "/reset-password",
     async (req, res) => {
-
         try {
-
             const token =
                 String(
-                    req.body.token ||
-                    ""
+                    req.body?.token || ""
                 ).trim();
-
 
             const password =
                 String(
-                    req.body.password ||
-                    ""
+                    req.body?.password || ""
                 );
 
-
-            if (
-                !token ||
-                !password
-            ) {
+            if (!token || !password) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -1775,17 +1583,13 @@ router.post(
                 });
             }
 
-
-            if (
-                password.length < 8
-            ) {
+            if (password.length < 8) {
                 return res.status(400).json({
                     success: false,
                     message:
                         "Password must be at least 8 characters."
                 });
             }
-
 
             const user =
                 await User.findOne({
@@ -1798,7 +1602,6 @@ router.post(
                     }
                 });
 
-
             if (!user) {
                 return res.status(400).json({
                     success: false,
@@ -1807,13 +1610,11 @@ router.post(
                 });
             }
 
-
             user.password =
                 await bcrypt.hash(
                     password,
                     12
                 );
-
 
             user.resetPasswordToken =
                 null;
@@ -1827,16 +1628,13 @@ router.post(
             user.authProvider =
                 "local";
 
-
             await user.save();
-
 
             return res.json({
                 success: true,
                 message:
                     "Password reset successfully. You can now log in."
             });
-
 
         } catch (error) {
 
@@ -1854,7 +1652,6 @@ router.post(
     }
 );
 
-
 /* ============================================================
    DELETE ACCOUNT
 ============================================================ */
@@ -1863,9 +1660,7 @@ router.delete(
     "/account",
     requireAuth,
     async (req, res) => {
-
         try {
-
             const email =
                 normalizeEmail(
                     req.body?.email
@@ -1873,28 +1668,21 @@ router.delete(
 
             const password =
                 String(
-                    req.body?.password ||
-                    ""
+                    req.body?.password || ""
                 );
 
             const confirmation =
                 String(
-                    req.body?.confirmation ||
-                    ""
+                    req.body?.confirmation || ""
                 ).trim();
 
-
-            if (
-                confirmation !==
-                "DELETE"
-            ) {
+            if (confirmation !== "DELETE") {
                 return res.status(400).json({
                     success: false,
                     message:
                         "Type DELETE exactly to confirm account deletion."
                 });
             }
-
 
             if (
                 !email ||
@@ -1910,12 +1698,10 @@ router.delete(
                 });
             }
 
-
             const isGoogleAccount =
                 req.user.authProvider ===
                     "google" &&
                 !req.user.password;
-
 
             if (!isGoogleAccount) {
 
@@ -1927,14 +1713,12 @@ router.delete(
                     });
                 }
 
-
                 const passwordCorrect =
                     await bcrypt.compare(
                         password,
                         req.user.password ||
                             ""
                     );
-
 
                 if (!passwordCorrect) {
                     return res.status(401).json({
@@ -1945,25 +1729,21 @@ router.delete(
                 }
             }
 
-
             await User.deleteOne({
                 _id:
                     req.user._id
             });
-
 
             res.clearCookie(
                 COOKIE_NAME,
                 getCookieOptions()
             );
 
-
             return res.json({
                 success: true,
                 message:
                     "TrueAegis account deleted successfully."
             });
-
 
         } catch (error) {
 
@@ -1981,7 +1761,6 @@ router.delete(
     }
 );
 
-
 /* ============================================================
    LOGOUT
 ============================================================ */
@@ -1995,7 +1774,6 @@ router.post(
             getCookieOptions()
         );
 
-
         return res.json({
             success: true,
             message:
@@ -2003,7 +1781,6 @@ router.post(
         });
     }
 );
-
 
 /* ============================================================
    GOOGLE CONFIG
@@ -2021,10 +1798,8 @@ router.get(
             });
         }
 
-
         return res.json({
             success: true,
-
             clientId:
                 GOOGLE_CLIENT_ID,
 
@@ -2036,7 +1811,6 @@ router.get(
         });
     }
 );
-
 
 /* ============================================================
    EXPORT AUTH MIDDLEWARE
