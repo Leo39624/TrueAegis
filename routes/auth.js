@@ -1,15 +1,19 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
 const jwt = require("jsonwebtoken");
 const { OAuth2Client } = require("google-auth-library");
 const User = require("../modules/user");
 
 const router = express.Router();
 
+/* ============================================================
+   CONFIGURATION
+============================================================ */
+
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
 const RESET_EXPIRY_MS = 15 * 60 * 1000;
+
 const COOKIE_NAME = "trueaegis_token";
 
 const BASE_URL = String(
@@ -31,6 +35,25 @@ const GOOGLE_REDIRECT_URI =
 const JWT_SECRET =
     process.env.JWT_SECRET || "";
 
+/* ============================================================
+   RESEND EMAIL CONFIGURATION
+============================================================ */
+
+const RESEND_API_KEY =
+    process.env.RESEND_API_KEY || "";
+
+const RESEND_FROM_EMAIL =
+    process.env.RESEND_FROM_EMAIL ||
+    "onboarding@resend.dev";
+
+const RESEND_FROM_NAME =
+    process.env.RESEND_FROM_NAME ||
+    "TrueAegis";
+
+/* ============================================================
+   GOOGLE CLIENT
+============================================================ */
+
 const googleClient = GOOGLE_CLIENT_ID
     ? new OAuth2Client(
         GOOGLE_CLIENT_ID,
@@ -50,11 +73,26 @@ function normalizeEmail(email) {
         .toLowerCase();
 }
 
+
 function generateOTP() {
     return String(
-        Math.floor(100000 + Math.random() * 900000)
+        Math.floor(
+            100000 +
+            Math.random() * 900000
+        )
     );
 }
+
+
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 
 function publicUser(user) {
     return {
@@ -68,10 +106,12 @@ function publicUser(user) {
     };
 }
 
+
 function getCookieOptions(maxAge) {
     const options = {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure:
+            process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/"
     };
@@ -83,7 +123,11 @@ function getCookieOptions(maxAge) {
     return options;
 }
 
-function createToken(user, rememberMe = false) {
+
+function createToken(
+    user,
+    rememberMe = false
+) {
     if (!JWT_SECRET) {
         throw new Error(
             "JWT_SECRET is not configured."
@@ -96,26 +140,37 @@ function createToken(user, rememberMe = false) {
         },
         JWT_SECRET,
         {
-            expiresIn: rememberMe
-                ? "30d"
-                : "1d"
+            expiresIn:
+                rememberMe
+                    ? "30d"
+                    : "1d"
         }
     );
 }
+
 
 function setLoginCookie(
     res,
     user,
     rememberMe = false
 ) {
-    const token = createToken(
-        user,
-        rememberMe
-    );
+    const token =
+        createToken(
+            user,
+            rememberMe
+        );
 
-    const maxAge = rememberMe
-        ? 30 * 24 * 60 * 60 * 1000
-        : 24 * 60 * 60 * 1000;
+    const maxAge =
+        rememberMe
+            ? 30 *
+              24 *
+              60 *
+              60 *
+              1000
+            : 24 *
+              60 *
+              60 *
+              1000;
 
     res.cookie(
         COOKIE_NAME,
@@ -144,7 +199,9 @@ async function requireAuth(
         }
 
         const token =
-            req.cookies?.[COOKIE_NAME];
+            req.cookies?.[
+                COOKIE_NAME
+            ];
 
         if (!token) {
             return res.status(401).json({
@@ -154,10 +211,11 @@ async function requireAuth(
             });
         }
 
-        const decoded = jwt.verify(
-            token,
-            JWT_SECRET
-        );
+        const decoded =
+            jwt.verify(
+                token,
+                JWT_SECRET
+            );
 
         const user =
             await User.findById(
@@ -175,7 +233,9 @@ async function requireAuth(
         req.user = user;
 
         next();
+
     } catch (error) {
+
         return res.status(401).json({
             success: false,
             message:
@@ -186,91 +246,167 @@ async function requireAuth(
 
 
 /* ============================================================
-   EMAIL
+   EMAIL — RESEND API
 ============================================================ */
-
-let transporter = null;
-
-if (
-    process.env.GMAIL_USER &&
-    process.env.GMAIL_APP_PASSWORD
-) {
-    transporter =
-        nodemailer.createTransport({
-            host: "smtp.gmail.com",
-            port: 465,
-            secure: true,
-
-            auth: {
-                user:
-                    process.env.GMAIL_USER,
-                pass:
-                    process.env.GMAIL_APP_PASSWORD
-            },
-
-            connectionTimeout: 15000,
-            greetingTimeout: 15000,
-            socketTimeout: 20000
-        });
-}
 
 async function sendEmail(
     to,
     subject,
     html
 ) {
-    if (!transporter) {
+    if (!RESEND_API_KEY) {
         throw new Error(
-            "Gmail email service is not configured."
+            "Resend email service is not configured."
         );
     }
 
-    await transporter.sendMail({
-        from:
-            `"TrueAegis" <${process.env.GMAIL_USER}>`,
-        to,
-        subject,
-        html
-    });
+    const response =
+        await fetch(
+            "https://api.resend.com/emails",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json",
+
+                    "Authorization":
+                        `Bearer ${RESEND_API_KEY}`
+                },
+
+                body: JSON.stringify({
+                    from:
+                        `${RESEND_FROM_NAME} <${RESEND_FROM_EMAIL}>`,
+
+                    to: [to],
+
+                    subject,
+
+                    html
+                })
+            }
+        );
+
+    let data = null;
+
+    try {
+        data =
+            await response.json();
+    } catch {
+        data = null;
+    }
+
+    if (!response.ok) {
+
+        const message =
+            data?.message ||
+            data?.error?.message ||
+            `Resend API returned HTTP ${response.status}.`;
+
+        throw new Error(message);
+    }
+
+    return data;
 }
+
+
+/* ============================================================
+   VERIFICATION EMAIL
+============================================================ */
 
 async function sendVerificationEmail(
     user
 ) {
     await sendEmail(
         user.email,
+
         "TrueAegis - Verify your email",
+
         `
-        <div style="font-family:Arial,sans-serif">
-            <h2>Welcome to TrueAegis</h2>
+        <div
+            style="
+                font-family:Arial,sans-serif;
+                max-width:600px;
+                margin:auto;
+                color:#172033;
+                line-height:1.6;
+            "
+        >
 
-            <p>Hello ${user.fullName},</p>
-
-            <p>
-                Your TrueAegis verification code is:
-            </p>
-
-            <h1
+            <h2
                 style="
-                    letter-spacing:6px;
-                    font-size:32px;
+                    color:#0f172a;
                 "
             >
-                ${user.otp}
-            </h1>
+                Welcome to TrueAegis
+            </h2>
 
             <p>
-                This code expires in 5 minutes.
+                Hello ${escapeHtml(
+                    user.fullName
+                )},
             </p>
 
             <p>
-                If you did not create this account,
-                you can ignore this email.
+                Your TrueAegis verification
+                code is:
             </p>
+
+            <div
+                style="
+                    font-size:32px;
+                    font-weight:700;
+                    letter-spacing:8px;
+                    margin:24px 0;
+                    padding:18px;
+                    background:#f1f5f9;
+                    border-radius:10px;
+                    text-align:center;
+                "
+            >
+                ${escapeHtml(
+                    user.otp
+                )}
+            </div>
+
+            <p>
+                This code expires in
+                <strong>5 minutes</strong>.
+            </p>
+
+            <p>
+                If you did not create this
+                account, you can safely ignore
+                this email.
+            </p>
+
+            <hr
+                style="
+                    border:0;
+                    border-top:1px solid #e5e7eb;
+                    margin:24px 0;
+                "
+            >
+
+            <p
+                style="
+                    font-size:12px;
+                    color:#64748b;
+                "
+            >
+                TrueAegis — Digital Trust
+                Intelligence
+            </p>
+
         </div>
         `
     );
 }
+
+
+/* ============================================================
+   PASSWORD RESET EMAIL
+============================================================ */
 
 async function sendResetEmail(
     user,
@@ -283,46 +419,95 @@ async function sendResetEmail(
 
     await sendEmail(
         user.email,
-        "TrueAegis - Reset your password",
-        `
-        <div style="font-family:Arial,sans-serif">
 
-            <h2>
+        "TrueAegis - Reset your password",
+
+        `
+        <div
+            style="
+                font-family:Arial,sans-serif;
+                max-width:600px;
+                margin:auto;
+                color:#172033;
+                line-height:1.6;
+            "
+        >
+
+            <h2
+                style="
+                    color:#0f172a;
+                "
+            >
                 Reset your TrueAegis password
             </h2>
 
             <p>
-                Hello ${user.fullName},
+                Hello ${escapeHtml(
+                    user.fullName
+                )},
             </p>
 
             <p>
-                Someone requested a password reset
-                for your TrueAegis account.
+                Someone requested a password
+                reset for your TrueAegis account.
             </p>
 
             <p>
+                Click the button below to create
+                a new password.
+            </p>
+
+            <p
+                style="
+                    margin:28px 0;
+                    text-align:center;
+                "
+            >
+
                 <a
                     href="${resetUrl}"
                     style="
                         display:inline-block;
                         padding:12px 20px;
                         background:#0ea5e9;
-                        color:white;
+                        color:#ffffff;
                         text-decoration:none;
-                        border-radius:6px;
+                        border-radius:8px;
+                        font-weight:600;
                     "
                 >
                     Reset Password
                 </a>
+
             </p>
 
             <p>
-                This link expires in 15 minutes.
+                This link expires in
+                <strong>15 minutes</strong>.
             </p>
 
             <p>
-                If you did not request this,
-                you can ignore this email.
+                If you did not request this
+                password reset, you can safely
+                ignore this email.
+            </p>
+
+            <hr
+                style="
+                    border:0;
+                    border-top:1px solid #e5e7eb;
+                    margin:24px 0;
+                "
+            >
+
+            <p
+                style="
+                    font-size:12px;
+                    color:#64748b;
+                "
+            >
+                TrueAegis — Digital Trust
+                Intelligence
             </p>
 
         </div>
@@ -338,8 +523,10 @@ async function sendResetEmail(
 router.get(
     "/health",
     (req, res) => {
+
         res.json({
             success: true,
+
             service:
                 "TrueAegis Authentication",
 
@@ -352,10 +539,14 @@ router.get(
                 GOOGLE_REDIRECT_URI,
 
             emailService:
-                Boolean(transporter),
+                Boolean(
+                    RESEND_API_KEY
+                ),
 
             jwt:
-                Boolean(JWT_SECRET)
+                Boolean(
+                    JWT_SECRET
+                )
         });
     }
 );
@@ -368,10 +559,13 @@ router.get(
 router.post(
     "/register",
     async (req, res) => {
+
         try {
+
             const fullName =
                 String(
-                    req.body.fullName || ""
+                    req.body.fullName ||
+                    ""
                 ).trim();
 
             const email =
@@ -381,7 +575,8 @@ router.post(
 
             const password =
                 String(
-                    req.body.password || ""
+                    req.body.password ||
+                    ""
                 );
 
             const age =
@@ -393,7 +588,8 @@ router.post(
                 String(
                     req.body.language ||
                     "English"
-                ).trim() || "English";
+                ).trim() ||
+                "English";
 
 
             if (!fullName) {
@@ -418,7 +614,9 @@ router.post(
             }
 
 
-            if (password.length < 8) {
+            if (
+                password.length < 8
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -448,11 +646,13 @@ router.post(
             const otp =
                 generateOTP();
 
+
             const otpExpires =
                 new Date(
                     Date.now() +
                     OTP_EXPIRY_MS
                 );
+
 
             const hashedPassword =
                 await bcrypt.hash(
@@ -470,6 +670,7 @@ router.post(
                             "An account with this email already exists."
                     });
                 }
+
 
                 user.fullName =
                     fullName;
@@ -542,6 +743,7 @@ router.post(
                     user.email
             });
 
+
         } catch (error) {
 
             console.error(
@@ -566,6 +768,7 @@ router.post(
 router.post(
     "/verify-otp",
     async (req, res) => {
+
         try {
 
             const email =
@@ -575,11 +778,15 @@ router.post(
 
             const otp =
                 String(
-                    req.body.otp || ""
+                    req.body.otp ||
+                    ""
                 ).trim();
 
 
-            if (!email || !otp) {
+            if (
+                !email ||
+                !otp
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -656,6 +863,7 @@ router.post(
             user.otpExpires =
                 null;
 
+
             await user.save();
 
 
@@ -666,6 +874,7 @@ router.post(
                 user:
                     publicUser(user)
             });
+
 
         } catch (error) {
 
@@ -691,12 +900,23 @@ router.post(
 router.post(
     "/resend-otp",
     async (req, res) => {
+
         try {
 
             const email =
                 normalizeEmail(
                     req.body.email
                 );
+
+
+            if (!email) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Email is required."
+                });
+            }
+
 
             const user =
                 await User.findOne({
@@ -731,6 +951,7 @@ router.post(
                     OTP_EXPIRY_MS
                 );
 
+
             await user.save();
 
 
@@ -750,7 +971,7 @@ router.post(
                 return res.status(503).json({
                     success: false,
                     message:
-                        "The verification email could not be sent. Please try again."
+                        "Verification email could not be sent."
                 });
             }
 
@@ -760,6 +981,7 @@ router.post(
                 message:
                     "A new verification code has been sent."
             });
+
 
         } catch (error) {
 
@@ -785,6 +1007,7 @@ router.post(
 router.post(
     "/login",
     async (req, res) => {
+
         try {
 
             const email =
@@ -794,7 +1017,8 @@ router.post(
 
             const password =
                 String(
-                    req.body.password || ""
+                    req.body.password ||
+                    ""
                 );
 
             const rememberMe =
@@ -879,6 +1103,7 @@ router.post(
                     publicUser(user)
             });
 
+
         } catch (error) {
 
             console.error(
@@ -903,6 +1128,7 @@ router.post(
 router.get(
     "/google",
     (req, res) => {
+
         try {
 
             if (
@@ -935,6 +1161,7 @@ router.get(
                 authUrl
             );
 
+
         } catch (error) {
 
             console.error(
@@ -957,6 +1184,7 @@ router.get(
 router.get(
     "/google/callback",
     async (req, res) => {
+
         try {
 
             if (
@@ -1070,8 +1298,7 @@ router.get(
 
                         password: null,
 
-                        verified:
-                            true,
+                        verified: true,
 
                         authProvider:
                             "google",
@@ -1121,6 +1348,7 @@ router.get(
                 "/?google=success"
             );
 
+
         } catch (error) {
 
             console.error(
@@ -1143,6 +1371,7 @@ router.get(
 router.post(
     "/google",
     async (req, res) => {
+
         try {
 
             if (!googleClient) {
@@ -1223,8 +1452,7 @@ router.post(
 
                         password: null,
 
-                        verified:
-                            true,
+                        verified: true,
 
                         authProvider:
                             "google",
@@ -1285,6 +1513,7 @@ router.post(
                     publicUser(user)
             });
 
+
         } catch (error) {
 
             console.error(
@@ -1329,6 +1558,7 @@ router.get(
 router.post(
     "/check-email",
     async (req, res) => {
+
         try {
 
             const email =
@@ -1368,6 +1598,7 @@ router.post(
                     null
             });
 
+
         } catch (error) {
 
             console.error(
@@ -1392,6 +1623,7 @@ router.post(
 router.post(
     "/forgot-password",
     async (req, res) => {
+
         try {
 
             const email =
@@ -1406,6 +1638,10 @@ router.post(
                 });
 
 
+            /*
+             * Do not reveal whether an email
+             * exists in the database.
+             */
             if (!user) {
                 return res.json({
                     success: true,
@@ -1429,13 +1665,14 @@ router.post(
 
 
             const resetToken =
-                crypto.randomBytes(
-                    32
-                ).toString("hex");
+                crypto
+                    .randomBytes(32)
+                    .toString("hex");
 
 
             user.resetPasswordToken =
                 resetToken;
+
 
             user.resetPasswordExpires =
                 new Date(
@@ -1485,6 +1722,7 @@ router.post(
                     "If an account exists with that email, a reset link has been sent."
             });
 
+
         } catch (error) {
 
             console.error(
@@ -1509,6 +1747,7 @@ router.post(
 router.post(
     "/reset-password",
     async (req, res) => {
+
         try {
 
             const token =
@@ -1516,6 +1755,7 @@ router.post(
                     req.body.token ||
                     ""
                 ).trim();
+
 
             const password =
                 String(
@@ -1597,6 +1837,7 @@ router.post(
                     "Password reset successfully. You can now log in."
             });
 
+
         } catch (error) {
 
             console.error(
@@ -1622,6 +1863,7 @@ router.delete(
     "/account",
     requireAuth,
     async (req, res) => {
+
         try {
 
             const email =
@@ -1722,6 +1964,7 @@ router.delete(
                     "TrueAegis account deleted successfully."
             });
 
+
         } catch (error) {
 
             console.error(
@@ -1781,6 +2024,7 @@ router.get(
 
         return res.json({
             success: true,
+
             clientId:
                 GOOGLE_CLIENT_ID,
 
@@ -1801,5 +2045,4 @@ router.get(
 router.requireAuth =
     requireAuth;
 
-module.exports =
-    router;
+module.exports = router;
