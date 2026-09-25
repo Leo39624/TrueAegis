@@ -48,14 +48,17 @@ const GMAIL_APP_PASSWORD =
 const gmailTransporter =
     GMAIL_USER && GMAIL_APP_PASSWORD
         ? nodemailer.createTransport({
-              service: "gmail",
+              host: "smtp.gmail.com",
+              port: 587,
+              secure: false,
+              requireTLS: true,
+              family: 4,
               auth: {
                   user: GMAIL_USER,
                   pass: GMAIL_APP_PASSWORD
               }
           })
         : null;
-
 /* ============================================================
    GOOGLE CLIENT
 ============================================================ */
