@@ -8,10 +8,6 @@ const User = require("../modules/user");
 
 const router = express.Router();
 
-/* ============================================================
-   CONFIG
-============================================================ */
-
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
 const RESET_EXPIRY_MS = 15 * 60 * 1000;
 const COOKIE_NAME = "trueaegis_token";
@@ -100,10 +96,9 @@ function createToken(user, rememberMe = false) {
         },
         JWT_SECRET,
         {
-            expiresIn:
-                rememberMe
-                    ? "30d"
-                    : "1d"
+            expiresIn: rememberMe
+                ? "30d"
+                : "1d"
         }
     );
 }
@@ -113,16 +108,14 @@ function setLoginCookie(
     user,
     rememberMe = false
 ) {
-    const token =
-        createToken(
-            user,
-            rememberMe
-        );
-
-    const maxAge =
+    const token = createToken(
+        user,
         rememberMe
-            ? 30 * 24 * 60 * 60 * 1000
-            : 24 * 60 * 60 * 1000;
+    );
+
+    const maxAge = rememberMe
+        ? 30 * 24 * 60 * 60 * 1000
+        : 24 * 60 * 60 * 1000;
 
     res.cookie(
         COOKIE_NAME,
@@ -161,11 +154,10 @@ async function requireAuth(
             });
         }
 
-        const decoded =
-            jwt.verify(
-                token,
-                JWT_SECRET
-            );
+        const decoded = jwt.verify(
+            token,
+            JWT_SECRET
+        );
 
         const user =
             await User.findById(
@@ -205,13 +197,20 @@ if (
 ) {
     transporter =
         nodemailer.createTransport({
-            service: "gmail",
+            host: "smtp.gmail.com",
+            port: 465,
+            secure: true,
+
             auth: {
                 user:
                     process.env.GMAIL_USER,
                 pass:
                     process.env.GMAIL_APP_PASSWORD
-            }
+            },
+
+            connectionTimeout: 15000,
+            greetingTimeout: 15000,
+            socketTimeout: 20000
         });
 }
 
@@ -242,7 +241,7 @@ async function sendVerificationEmail(
         user.email,
         "TrueAegis - Verify your email",
         `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto">
+        <div style="font-family:Arial,sans-serif">
             <h2>Welcome to TrueAegis</h2>
 
             <p>Hello ${user.fullName},</p>
@@ -251,7 +250,12 @@ async function sendVerificationEmail(
                 Your TrueAegis verification code is:
             </p>
 
-            <h1 style="letter-spacing:6px">
+            <h1
+                style="
+                    letter-spacing:6px;
+                    font-size:32px;
+                "
+            >
                 ${user.otp}
             </h1>
 
@@ -281,7 +285,7 @@ async function sendResetEmail(
         user.email,
         "TrueAegis - Reset your password",
         `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto">
+        <div style="font-family:Arial,sans-serif">
 
             <h2>
                 Reset your TrueAegis password
@@ -305,8 +309,7 @@ async function sendResetEmail(
                         background:#0ea5e9;
                         color:white;
                         text-decoration:none;
-                        border-radius:8px;
-                        font-weight:bold;
+                        border-radius:6px;
                     "
                 >
                     Reset Password
@@ -319,7 +322,7 @@ async function sendResetEmail(
 
             <p>
                 If you did not request this,
-                you can safely ignore this email.
+                you can ignore this email.
             </p>
 
         </div>
@@ -339,14 +342,18 @@ router.get(
             success: true,
             service:
                 "TrueAegis Authentication",
+
             googleLogin:
                 Boolean(
                     GOOGLE_CLIENT_ID
                 ),
+
             googleRedirectUri:
                 GOOGLE_REDIRECT_URI,
+
             emailService:
                 Boolean(transporter),
+
             jwt:
                 Boolean(JWT_SECRET)
         });
@@ -386,8 +393,8 @@ router.post(
                 String(
                     req.body.language ||
                     "English"
-                ).trim() ||
-                "English";
+                ).trim() || "English";
+
 
             if (!fullName) {
                 return res.status(400).json({
@@ -396,6 +403,7 @@ router.post(
                         "Full name is required."
                 });
             }
+
 
             if (
                 !/^[^\s@]+@gmail\.com$/i.test(
@@ -409,6 +417,7 @@ router.post(
                 });
             }
 
+
             if (password.length < 8) {
                 return res.status(400).json({
                     success: false,
@@ -416,6 +425,7 @@ router.post(
                         "Password must be at least 8 characters."
                 });
             }
+
 
             if (
                 !Number.isInteger(age) ||
@@ -428,10 +438,12 @@ router.post(
                 });
             }
 
+
             let user =
                 await User.findOne({
                     email
                 });
+
 
             const otp =
                 generateOTP();
@@ -448,7 +460,9 @@ router.post(
                     12
                 );
 
+
             if (user) {
+
                 if (user.verified) {
                     return res.status(409).json({
                         success: false,
@@ -479,7 +493,9 @@ router.post(
                     "local";
 
                 await user.save();
+
             } else {
+
                 user =
                     await User.create({
                         fullName,
@@ -488,8 +504,7 @@ router.post(
                         language,
                         password:
                             hashedPassword,
-                        verified:
-                            false,
+                        verified: false,
                         authProvider:
                             "local",
                         otp,
@@ -497,11 +512,15 @@ router.post(
                     });
             }
 
+
             try {
+
                 await sendVerificationEmail(
                     user
                 );
+
             } catch (emailError) {
+
                 console.error(
                     "Verification email failed:",
                     emailError.message
@@ -510,9 +529,10 @@ router.post(
                 return res.status(503).json({
                     success: false,
                     message:
-                        "Account created, but the verification email could not be sent. Check the Gmail email-service settings."
+                        "Account created, but the verification email could not be sent. Please try again."
                 });
             }
+
 
             return res.status(201).json({
                 success: true,
@@ -523,6 +543,7 @@ router.post(
             });
 
         } catch (error) {
+
             console.error(
                 "Register error:",
                 error
@@ -546,6 +567,7 @@ router.post(
     "/verify-otp",
     async (req, res) => {
         try {
+
             const email =
                 normalizeEmail(
                     req.body.email
@@ -556,6 +578,7 @@ router.post(
                     req.body.otp || ""
                 ).trim();
 
+
             if (!email || !otp) {
                 return res.status(400).json({
                     success: false,
@@ -564,10 +587,12 @@ router.post(
                 });
             }
 
+
             const user =
                 await User.findOne({
                     email
                 });
+
 
             if (!user) {
                 return res.status(404).json({
@@ -577,6 +602,7 @@ router.post(
                 });
             }
 
+
             if (user.verified) {
                 return res.json({
                     success: true,
@@ -584,6 +610,7 @@ router.post(
                         "Email is already verified."
                 });
             }
+
 
             if (
                 !user.otp ||
@@ -596,11 +623,10 @@ router.post(
                 });
             }
 
+
             if (
                 Date.now() >
-                new Date(
-                    user.otpExpires
-                ).getTime()
+                user.otpExpires.getTime()
             ) {
                 return res.status(400).json({
                     success: false,
@@ -608,6 +634,7 @@ router.post(
                         "OTP has expired. Please request a new one."
                 });
             }
+
 
             if (
                 user.otp !== otp
@@ -618,6 +645,7 @@ router.post(
                         "Incorrect verification code."
                 });
             }
+
 
             user.verified =
                 true;
@@ -630,6 +658,7 @@ router.post(
 
             await user.save();
 
+
             return res.json({
                 success: true,
                 message:
@@ -639,6 +668,7 @@ router.post(
             });
 
         } catch (error) {
+
             console.error(
                 "Verify OTP error:",
                 error
@@ -662,6 +692,7 @@ router.post(
     "/resend-otp",
     async (req, res) => {
         try {
+
             const email =
                 normalizeEmail(
                     req.body.email
@@ -672,6 +703,7 @@ router.post(
                     email
                 });
 
+
             if (!user) {
                 return res.status(404).json({
                     success: false,
@@ -680,6 +712,7 @@ router.post(
                 });
             }
 
+
             if (user.verified) {
                 return res.status(400).json({
                     success: false,
@@ -687,6 +720,7 @@ router.post(
                         "This account is already verified."
                 });
             }
+
 
             user.otp =
                 generateOTP();
@@ -699,22 +733,27 @@ router.post(
 
             await user.save();
 
+
             try {
+
                 await sendVerificationEmail(
                     user
                 );
+
             } catch (emailError) {
+
                 console.error(
-                    "Resend email error:",
-                    emailError
+                    "Resend OTP email failed:",
+                    emailError.message
                 );
 
                 return res.status(503).json({
                     success: false,
                     message:
-                        "Could not send the verification email. Check the Gmail email-service settings."
+                        "The verification email could not be sent. Please try again."
                 });
             }
+
 
             return res.json({
                 success: true,
@@ -723,6 +762,7 @@ router.post(
             });
 
         } catch (error) {
+
             console.error(
                 "Resend OTP error:",
                 error
@@ -746,6 +786,7 @@ router.post(
     "/login",
     async (req, res) => {
         try {
+
             const email =
                 normalizeEmail(
                     req.body.email
@@ -760,10 +801,12 @@ router.post(
                 req.body.rememberMe === true ||
                 req.body.rememberMe === "true";
 
+
             const user =
                 await User.findOne({
                     email
                 });
+
 
             if (!user) {
                 return res.status(401).json({
@@ -772,6 +815,7 @@ router.post(
                         "Invalid email or password."
                 });
             }
+
 
             if (
                 user.authProvider ===
@@ -785,6 +829,7 @@ router.post(
                 });
             }
 
+
             if (!user.password) {
                 return res.status(401).json({
                     success: false,
@@ -793,11 +838,13 @@ router.post(
                 });
             }
 
+
             const passwordCorrect =
                 await bcrypt.compare(
                     password,
                     user.password
                 );
+
 
             if (!passwordCorrect) {
                 return res.status(401).json({
@@ -807,6 +854,7 @@ router.post(
                 });
             }
 
+
             if (!user.verified) {
                 return res.status(403).json({
                     success: false,
@@ -815,11 +863,13 @@ router.post(
                 });
             }
 
+
             setLoginCookie(
                 res,
                 user,
                 rememberMe
             );
+
 
             return res.json({
                 success: true,
@@ -830,6 +880,7 @@ router.post(
             });
 
         } catch (error) {
+
             console.error(
                 "Login error:",
                 error
@@ -853,6 +904,7 @@ router.get(
     "/google",
     (req, res) => {
         try {
+
             if (
                 !googleClient ||
                 !GOOGLE_CLIENT_ID
@@ -861,6 +913,7 @@ router.get(
                     "Google Login is not configured."
                 );
             }
+
 
             const authUrl =
                 googleClient.generateAuthUrl({
@@ -877,11 +930,13 @@ router.get(
                     ]
                 });
 
+
             return res.redirect(
                 authUrl
             );
 
         } catch (error) {
+
             console.error(
                 "Google OAuth start error:",
                 error
@@ -903,6 +958,7 @@ router.get(
     "/google/callback",
     async (req, res) => {
         try {
+
             if (
                 !googleClient ||
                 !GOOGLE_CLIENT_ID
@@ -912,16 +968,33 @@ router.get(
                 );
             }
 
-            if (req.query?.error) {
+
+            const errorParam =
+                String(
+                    req.query?.error ||
+                    ""
+                ).trim();
+
+
+            if (errorParam) {
+
+                console.error(
+                    "Google OAuth returned error:",
+                    errorParam
+                );
+
                 return res.redirect(
                     "/?google=error&message=Google+Login+was+cancelled+or+denied."
                 );
             }
 
+
             const code =
                 String(
-                    req.query?.code || ""
+                    req.query?.code ||
+                    ""
                 ).trim();
+
 
             if (!code) {
                 return res.redirect(
@@ -929,10 +1002,12 @@ router.get(
                 );
             }
 
+
             const { tokens } =
                 await googleClient.getToken(
                     code
                 );
+
 
             if (!tokens?.id_token) {
                 throw new Error(
@@ -940,16 +1015,20 @@ router.get(
                 );
             }
 
+
             const ticket =
                 await googleClient.verifyIdToken({
                     idToken:
                         tokens.id_token,
+
                     audience:
                         GOOGLE_CLIENT_ID
                 });
 
+
             const payload =
                 ticket.getPayload();
+
 
             if (
                 !payload ||
@@ -961,17 +1040,21 @@ router.get(
                 );
             }
 
+
             const email =
                 normalizeEmail(
                     payload.email
                 );
+
 
             let user =
                 await User.findOne({
                     email
                 });
 
+
             if (!user) {
+
                 user =
                     await User.create({
                         fullName:
@@ -985,8 +1068,7 @@ router.get(
                         language:
                             "English",
 
-                        password:
-                            null,
+                        password: null,
 
                         verified:
                             true,
@@ -997,7 +1079,9 @@ router.get(
                         googleId:
                             payload.sub
                     });
+
             } else {
+
                 if (
                     user.googleId &&
                     user.googleId !==
@@ -1008,19 +1092,23 @@ router.get(
                     );
                 }
 
+
                 user.googleId =
                     payload.sub;
 
                 user.verified =
                     true;
 
+
                 if (!user.password) {
                     user.authProvider =
                         "google";
                 }
 
+
                 await user.save();
             }
+
 
             setLoginCookie(
                 res,
@@ -1028,11 +1116,13 @@ router.get(
                 true
             );
 
+
             return res.redirect(
                 "/?google=success"
             );
 
         } catch (error) {
+
             console.error(
                 "Google OAuth callback error:",
                 error
@@ -1047,13 +1137,14 @@ router.get(
 
 
 /* ============================================================
-   GOOGLE CREDENTIAL LOGIN
+   GOOGLE LOGIN — CREDENTIAL MODE
 ============================================================ */
 
 router.post(
     "/google",
     async (req, res) => {
         try {
+
             if (!googleClient) {
                 return res.status(503).json({
                     success: false,
@@ -1062,8 +1153,10 @@ router.post(
                 });
             }
 
+
             const credential =
                 req.body.credential;
+
 
             if (!credential) {
                 return res.status(400).json({
@@ -1073,16 +1166,20 @@ router.post(
                 });
             }
 
+
             const ticket =
                 await googleClient.verifyIdToken({
                     idToken:
                         credential,
+
                     audience:
                         GOOGLE_CLIENT_ID
                 });
 
+
             const payload =
                 ticket.getPayload();
+
 
             if (
                 !payload ||
@@ -1096,17 +1193,21 @@ router.post(
                 });
             }
 
+
             const email =
                 normalizeEmail(
                     payload.email
                 );
+
 
             let user =
                 await User.findOne({
                     email
                 });
 
+
             if (!user) {
+
                 user =
                     await User.create({
                         fullName:
@@ -1120,8 +1221,7 @@ router.post(
                         language:
                             "English",
 
-                        password:
-                            null,
+                        password: null,
 
                         verified:
                             true,
@@ -1132,7 +1232,9 @@ router.post(
                         googleId:
                             payload.sub
                     });
+
             } else {
+
                 if (
                     user.googleId &&
                     user.googleId !==
@@ -1145,29 +1247,35 @@ router.post(
                     });
                 }
 
+
                 user.googleId =
                     payload.sub;
 
                 user.verified =
                     true;
 
+
                 if (!user.password) {
                     user.authProvider =
                         "google";
                 }
 
+
                 await user.save();
             }
+
 
             const rememberMe =
                 req.body.rememberMe === true ||
                 req.body.rememberMe === "true";
+
 
             setLoginCookie(
                 res,
                 user,
                 rememberMe
             );
+
 
             return res.json({
                 success: true,
@@ -1178,6 +1286,7 @@ router.post(
             });
 
         } catch (error) {
+
             console.error(
                 "Google Login error:",
                 error
@@ -1201,6 +1310,7 @@ router.get(
     "/me",
     requireAuth,
     async (req, res) => {
+
         return res.json({
             success: true,
             user:
@@ -1220,10 +1330,12 @@ router.post(
     "/check-email",
     async (req, res) => {
         try {
+
             const email =
                 normalizeEmail(
                     req.body.email
                 );
+
 
             if (!email) {
                 return res.status(400).json({
@@ -1233,25 +1345,31 @@ router.post(
                 });
             }
 
+
             const user =
                 await User.findOne({
                     email
                 });
 
+
             return res.json({
                 success: true,
+
                 exists:
                     Boolean(user),
+
                 verified:
                     Boolean(
                         user?.verified
                     ),
+
                 authProvider:
                     user?.authProvider ||
                     null
             });
 
         } catch (error) {
+
             console.error(
                 "Check email error:",
                 error
@@ -1275,28 +1393,19 @@ router.post(
     "/forgot-password",
     async (req, res) => {
         try {
+
             const email =
                 normalizeEmail(
                     req.body.email
                 );
 
-            if (!email) {
-                return res.status(400).json({
-                    success: false,
-                    message:
-                        "Email is required."
-                });
-            }
 
             const user =
                 await User.findOne({
                     email
                 });
 
-            /*
-             * Always return a generic success message
-             * when the account does not exist.
-             */
+
             if (!user) {
                 return res.json({
                     success: true,
@@ -1305,9 +1414,7 @@ router.post(
                 });
             }
 
-            /*
-             * Google-only accounts do not have a local password.
-             */
+
             if (
                 user.authProvider ===
                     "google" &&
@@ -1320,10 +1427,12 @@ router.post(
                 });
             }
 
+
             const resetToken =
-                crypto
-                    .randomBytes(32)
-                    .toString("hex");
+                crypto.randomBytes(
+                    32
+                ).toString("hex");
+
 
             user.resetPasswordToken =
                 resetToken;
@@ -1334,18 +1443,19 @@ router.post(
                     RESET_EXPIRY_MS
                 );
 
+
             await user.save();
 
+
             try {
+
                 await sendResetEmail(
                     user,
                     resetToken
                 );
+
             } catch (emailError) {
-                /*
-                 * IMPORTANT:
-                 * Remove the token if email delivery fails.
-                 */
+
                 user.resetPasswordToken =
                     null;
 
@@ -1354,17 +1464,20 @@ router.post(
 
                 await user.save();
 
+
                 console.error(
                     "Password reset email failed:",
-                    emailError
+                    emailError.message
                 );
+
 
                 return res.status(503).json({
                     success: false,
                     message:
-                        "Password reset email could not be sent. Check the Gmail email-service settings on the server."
+                        "Password reset email could not be sent. Please try again."
                 });
             }
+
 
             return res.json({
                 success: true,
@@ -1373,6 +1486,7 @@ router.post(
             });
 
         } catch (error) {
+
             console.error(
                 "Forgot password error:",
                 error
@@ -1396,17 +1510,24 @@ router.post(
     "/reset-password",
     async (req, res) => {
         try {
+
             const token =
                 String(
-                    req.body.token || ""
+                    req.body.token ||
+                    ""
                 ).trim();
 
             const password =
                 String(
-                    req.body.password || ""
+                    req.body.password ||
+                    ""
                 );
 
-            if (!token || !password) {
+
+            if (
+                !token ||
+                !password
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -1414,7 +1535,10 @@ router.post(
                 });
             }
 
-            if (password.length < 8) {
+
+            if (
+                password.length < 8
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -1422,15 +1546,18 @@ router.post(
                 });
             }
 
+
             const user =
                 await User.findOne({
                     resetPasswordToken:
                         token,
 
                     resetPasswordExpires: {
-                        $gt: new Date()
+                        $gt:
+                            new Date()
                     }
                 });
+
 
             if (!user) {
                 return res.status(400).json({
@@ -1440,11 +1567,13 @@ router.post(
                 });
             }
 
+
             user.password =
                 await bcrypt.hash(
                     password,
                     12
                 );
+
 
             user.resetPasswordToken =
                 null;
@@ -1458,7 +1587,9 @@ router.post(
             user.authProvider =
                 "local";
 
+
             await user.save();
+
 
             return res.json({
                 success: true,
@@ -1467,6 +1598,7 @@ router.post(
             });
 
         } catch (error) {
+
             console.error(
                 "Reset password error:",
                 error
@@ -1491,6 +1623,7 @@ router.delete(
     requireAuth,
     async (req, res) => {
         try {
+
             const email =
                 normalizeEmail(
                     req.body?.email
@@ -1508,9 +1641,7 @@ router.delete(
                     ""
                 ).trim();
 
-            /*
-             * Require exact DELETE confirmation.
-             */
+
             if (
                 confirmation !==
                 "DELETE"
@@ -1522,10 +1653,7 @@ router.delete(
                 });
             }
 
-            /*
-             * Make sure the account being deleted
-             * matches the authenticated session.
-             */
+
             if (
                 !email ||
                 email !==
@@ -1540,17 +1668,15 @@ router.delete(
                 });
             }
 
-            /*
-             * Google-only accounts don't have a local
-             * password, so the authenticated Google session
-             * is sufficient.
-             */
+
             const isGoogleAccount =
                 req.user.authProvider ===
                     "google" &&
                 !req.user.password;
 
+
             if (!isGoogleAccount) {
+
                 if (!password) {
                     return res.status(400).json({
                         success: false,
@@ -1559,12 +1685,14 @@ router.delete(
                     });
                 }
 
+
                 const passwordCorrect =
                     await bcrypt.compare(
                         password,
                         req.user.password ||
                             ""
                     );
+
 
                 if (!passwordCorrect) {
                     return res.status(401).json({
@@ -1575,15 +1703,18 @@ router.delete(
                 }
             }
 
+
             await User.deleteOne({
                 _id:
                     req.user._id
             });
 
+
             res.clearCookie(
                 COOKIE_NAME,
                 getCookieOptions()
             );
+
 
             return res.json({
                 success: true,
@@ -1592,6 +1723,7 @@ router.delete(
             });
 
         } catch (error) {
+
             console.error(
                 "Delete account error:",
                 error
@@ -1614,10 +1746,12 @@ router.delete(
 router.post(
     "/logout",
     (req, res) => {
+
         res.clearCookie(
             COOKIE_NAME,
             getCookieOptions()
         );
+
 
         return res.json({
             success: true,
@@ -1635,6 +1769,7 @@ router.post(
 router.get(
     "/google/config",
     (req, res) => {
+
         if (!GOOGLE_CLIENT_ID) {
             return res.status(503).json({
                 success: false,
@@ -1643,12 +1778,15 @@ router.get(
             });
         }
 
+
         return res.json({
             success: true,
             clientId:
                 GOOGLE_CLIENT_ID,
+
             redirectUri:
                 GOOGLE_REDIRECT_URI,
+
             baseUrl:
                 BASE_URL
         });
@@ -1657,10 +1795,11 @@ router.get(
 
 
 /* ============================================================
-   EXPORT
+   EXPORT AUTH MIDDLEWARE
 ============================================================ */
 
 router.requireAuth =
     requireAuth;
 
-module.exports = router;
+module.exports =
+    router;
