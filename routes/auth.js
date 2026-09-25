@@ -52,7 +52,9 @@ const gmailTransporter =
               port: 587,
               secure: false,
               requireTLS: true,
-              family: 4,
+              dns: {
+                  family: 4
+              },
               auth: {
                   user: GMAIL_USER,
                   pass: GMAIL_APP_PASSWORD
