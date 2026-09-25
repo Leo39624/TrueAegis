@@ -2273,21 +2273,26 @@ app.post(
 
 /* VIDEO VERIFICATION */
 
-app.post(
-  "/api/video-verification",
-  async (req, res) => {
-    return app._router
-      ? res.redirect(
-          307,
-          "/api/media-analysis"
-        )
-      : res.status(500).json({
-          success: false,
-          error:
-            "Media router unavailable."
-        });
+app.post("/api/video-verification", async (req, res) => {
+  try {
+    // Keep this endpoint as a compatibility alias for
+    // the main media-analysis endpoint.
+    req.url = "/api/media-analysis";
+
+    return app.handle(req, res);
+  } catch (error) {
+    console.error("❌ Video verification error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Video verification failed.",
+      details:
+        NODE_ENV === "development"
+          ? error.message
+          : undefined
+    });
   }
-);
+});
 
 /* API ROOT */
 
