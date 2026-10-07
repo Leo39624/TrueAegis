@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const dns = require("dns");
 const { OAuth2Client } = require("google-auth-library");
+
 const User = require("../modules/user");
 
 const router = express.Router();
@@ -39,8 +40,9 @@ const JWT_SECRET =
 
 /* ============================================================
    GMAIL SMTP
-   Render has previously resolved smtp.gmail.com to IPv6.
-   We explicitly force IPv4 DNS resolution.
+
+   Render can sometimes resolve smtp.gmail.com through IPv6.
+   Force IPv4 DNS resolution for Gmail SMTP.
 ============================================================ */
 
 const GMAIL_USER =
@@ -58,7 +60,7 @@ function gmailIpv4Lookup(
         hostname,
         {
             family: 4,
-            all: false,
+            all: false
         },
         callback
     );
@@ -68,33 +70,22 @@ const gmailTransporter =
     GMAIL_USER && GMAIL_APP_PASSWORD
         ? nodemailer.createTransport({
               host: "smtp.gmail.com",
-
               port: 587,
-
               secure: false,
-
               requireTLS: true,
 
               lookup: gmailIpv4Lookup,
 
               connectionTimeout: 30000,
-
               greetingTimeout: 30000,
-
               socketTimeout: 60000,
 
               auth: {
                   user: GMAIL_USER,
-                  pass: GMAIL_APP_PASSWORD,
-              },
+                  pass: GMAIL_APP_PASSWORD
+              }
           })
         : null;
-
-/*
-   Port 587 uses STARTTLS.
-   Nodemailer documents port 587 with secure:false
-   and STARTTLS rather than implicit TLS on port 465.
-*/
 
 /* ============================================================
    GOOGLE CLIENT
@@ -143,46 +134,55 @@ function escapeHtml(value) {
 function publicUser(user) {
     return {
         id: String(user._id),
-        fullName: user.fullName || "",
-        email: user.email || "",
+
+        fullName:
+            user.fullName || "",
+
+        email:
+            user.email || "",
+
         age:
             typeof user.age === "number"
                 ? user.age
                 : null,
+
         language:
             user.language || "English",
+
         verified:
             Boolean(user.verified),
+
         authProvider:
-            user.authProvider || "local",
+            user.authProvider || "local"
     };
 }
 
-function getCookieOptions(
-    maxAge
-) {
+/* ============================================================
+   COOKIE OPTIONS
+============================================================ */
+
+function getCookieOptions(maxAge) {
     const options = {
         httpOnly: true,
 
         secure:
-            BASE_URL.startsWith(
-                "https://"
-            ),
+            BASE_URL.startsWith("https://"),
 
         sameSite: "lax",
 
-        path: "/",
+        path: "/"
     };
 
-    if (
-        typeof maxAge ===
-        "number"
-    ) {
+    if (typeof maxAge === "number") {
         options.maxAge = maxAge;
     }
 
     return options;
 }
+
+/* ============================================================
+   JWT
+============================================================ */
 
 function createToken(
     user,
@@ -196,9 +196,7 @@ function createToken(
 
     return jwt.sign(
         {
-            id: String(
-                user._id
-            ),
+            id: String(user._id)
         },
 
         JWT_SECRET,
@@ -207,7 +205,7 @@ function createToken(
             expiresIn:
                 rememberMe
                     ? "30d"
-                    : "1d",
+                    : "1d"
         }
     );
 }
@@ -238,9 +236,7 @@ function setLoginCookie(
     res.cookie(
         COOKIE_NAME,
         token,
-        getCookieOptions(
-            maxAge
-        )
+        getCookieOptions(maxAge)
     );
 }
 
@@ -260,7 +256,7 @@ async function requireAuth(
                 .json({
                     success: false,
                     message:
-                        "Authentication is not configured.",
+                        "Authentication is not configured."
                 });
         }
 
@@ -275,7 +271,7 @@ async function requireAuth(
                 .json({
                     success: false,
                     message:
-                        "You are not logged in.",
+                        "You are not logged in."
                 });
         }
 
@@ -296,7 +292,7 @@ async function requireAuth(
                 .json({
                     success: false,
                     message:
-                        "User account not found.",
+                        "User account not found."
                 });
         }
 
@@ -309,7 +305,7 @@ async function requireAuth(
             .json({
                 success: false,
                 message:
-                    "Your login session has expired.",
+                    "Your login session has expired."
             });
     }
 }
@@ -344,22 +340,20 @@ async function sendEmail(
 
     try {
         const result =
-            await gmailTransporter.sendMail(
-                {
-                    from:
-                        `"TrueAegis" <${GMAIL_USER}>`,
+            await gmailTransporter.sendMail({
+                from:
+                    `"TrueAegis" <${GMAIL_USER}>`,
 
-                    to,
+                to,
 
-                    subject,
+                subject,
 
-                    html,
+                html,
 
-                    text:
-                        text ||
-                        "This email was sent by TrueAegis.",
-                }
-            );
+                text:
+                    text ||
+                    "This email was sent by TrueAegis."
+            });
 
         console.log(
             "[EMAIL] Gmail email sent successfully:",
@@ -370,8 +364,7 @@ async function sendEmail(
     } catch (error) {
         console.error(
             "[EMAIL] Gmail sending error:",
-            error?.message ||
-                error
+            error?.message || error
         );
 
         throw new Error(
@@ -415,29 +408,29 @@ async function sendVerificationEmail(
 
 <body
 style="
-    margin:0;
-    padding:0;
-    background:#f8fafc;
-    font-family:Arial,Helvetica,sans-serif;
-    color:#172033;
+margin:0;
+padding:0;
+background:#f8fafc;
+font-family:Arial,Helvetica,sans-serif;
+color:#172033;
 "
 >
 
 <div
 style="
-    max-width:600px;
-    margin:40px auto;
-    background:#ffffff;
-    border-radius:16px;
-    padding:36px;
-    box-shadow:0 10px 30px rgba(15,23,42,.08);
+max-width:600px;
+margin:40px auto;
+background:#ffffff;
+border-radius:16px;
+padding:36px;
+box-shadow:0 10px 30px rgba(15,23,42,.08);
 "
 >
 
 <h2
 style="
-    margin-top:0;
-    color:#0f172a;
+margin-top:0;
+color:#0f172a;
 "
 >
 Welcome to TrueAegis
@@ -453,20 +446,20 @@ Use the verification code below to verify your TrueAegis account.
 
 <div
 style="
-    margin:28px 0;
-    padding:20px;
-    text-align:center;
-    background:#f1f5f9;
-    border-radius:12px;
+margin:28px 0;
+padding:20px;
+text-align:center;
+background:#f1f5f9;
+border-radius:12px;
 "
 >
 
 <div
 style="
-    font-size:34px;
-    font-weight:700;
-    letter-spacing:8px;
-    color:#0f172a;
+font-size:34px;
+font-weight:700;
+letter-spacing:8px;
+color:#0f172a;
 "
 >
 ${otp}
@@ -485,17 +478,17 @@ If you did not create this account, you can safely ignore this email.
 
 <hr
 style="
-    border:0;
-    border-top:1px solid #e2e8f0;
-    margin:28px 0;
+border:0;
+border-top:1px solid #e2e8f0;
+margin:28px 0;
 "
 >
 
 <p
 style="
-    margin:0;
-    font-size:12px;
-    color:#64748b;
+margin:0;
+font-size:12px;
+color:#64748b;
 "
 >
 TrueAegis — Digital Trust Intelligence
@@ -539,28 +532,28 @@ async function sendResetEmail(
 
 <body
 style="
-    margin:0;
-    padding:0;
-    background:#f8fafc;
-    font-family:Arial,Helvetica,sans-serif;
-    color:#172033;
+margin:0;
+padding:0;
+background:#f8fafc;
+font-family:Arial,Helvetica,sans-serif;
+color:#172033;
 "
 >
 
 <div
 style="
-    max-width:600px;
-    margin:40px auto;
-    background:#ffffff;
-    border-radius:16px;
-    padding:36px;
+max-width:600px;
+margin:40px auto;
+background:#ffffff;
+border-radius:16px;
+padding:36px;
 "
 >
 
 <h2
 style="
-    margin-top:0;
-    color:#0f172a;
+margin-top:0;
+color:#0f172a;
 "
 >
 Reset your TrueAegis password
@@ -568,8 +561,8 @@ Reset your TrueAegis password
 
 <p>
 Hello ${escapeHtml(
-            user.fullName
-        )},
+    user.fullName
+)},
 </p>
 
 <p>
@@ -582,21 +575,21 @@ Use the button below to create a new password.
 
 <div
 style="
-    text-align:center;
-    margin:30px 0;
+text-align:center;
+margin:30px 0;
 "
 >
 
 <a
 href="${resetUrl}"
 style="
-    display:inline-block;
-    padding:14px 24px;
-    background:#0ea5e9;
-    color:#ffffff;
-    text-decoration:none;
-    border-radius:10px;
-    font-weight:700;
+display:inline-block;
+padding:14px 24px;
+background:#0ea5e9;
+color:#ffffff;
+text-decoration:none;
+border-radius:10px;
+font-weight:700;
 "
 >
 Reset Password
@@ -615,17 +608,17 @@ If you did not request this reset, you can safely ignore this email.
 
 <hr
 style="
-    border:0;
-    border-top:1px solid #e2e8f0;
-    margin:28px 0;
+border:0;
+border-top:1px solid #e2e8f0;
+margin:28px 0;
 "
 >
 
 <p
 style="
-    margin:0;
-    font-size:12px;
-    color:#64748b;
+margin:0;
+font-size:12px;
+color:#64748b;
 "
 >
 TrueAegis — Digital Trust Intelligence
@@ -674,14 +667,16 @@ router.get(
             smtpHost:
                 "smtp.gmail.com",
 
-            smtpPort: 587,
+            smtpPort:
+                587,
 
-            smtpIpv4Only: true,
+            smtpIpv4Only:
+                true,
 
             jwt:
                 Boolean(
                     JWT_SECRET
-                ),
+                )
         });
     }
 );
@@ -699,8 +694,7 @@ router.post(
 
             const fullName =
                 String(
-                    body.fullName ||
-                        ""
+                    body.fullName || ""
                 ).trim();
 
             const email =
@@ -710,8 +704,7 @@ router.post(
 
             const password =
                 String(
-                    body.password ||
-                        ""
+                    body.password || ""
                 );
 
             const age =
@@ -722,9 +715,13 @@ router.post(
             const language =
                 String(
                     body.language ||
-                        "English"
+                    "English"
                 ).trim() ||
                 "English";
+
+            /* ------------------------------------------------
+               VALIDATION
+            ------------------------------------------------ */
 
             if (!fullName) {
                 return res
@@ -732,33 +729,31 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Full name is required.",
+                            "Full name is required."
                     });
             }
 
             if (
-                fullName.length <
-                2
+                fullName.length < 2
             ) {
                 return res
                     .status(400)
                     .json({
                         success: false,
                         message:
-                            "Please enter your full name.",
+                            "Please enter your full name."
                     });
             }
 
             if (
-                fullName.length >
-                100
+                fullName.length > 100
             ) {
                 return res
                     .status(400)
                     .json({
                         success: false,
                         message:
-                            "Full name is too long.",
+                            "Full name is too long."
                     });
             }
 
@@ -772,40 +767,36 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Please use a valid Gmail address.",
+                            "Please use a valid Gmail address."
                     });
             }
 
             if (
-                password.length <
-                8
+                password.length < 8
             ) {
                 return res
                     .status(400)
                     .json({
                         success: false,
                         message:
-                            "Password must be at least 8 characters.",
+                            "Password must be at least 8 characters."
                     });
             }
 
             if (
-                password.length >
-                128
+                password.length > 128
             ) {
                 return res
                     .status(400)
                     .json({
                         success: false,
                         message:
-                            "Password is too long.",
+                            "Password is too long."
                     });
             }
 
             if (
-                !Number.isInteger(
-                    age
-                ) ||
+                !Number.isInteger(age) ||
                 age < 13
             ) {
                 return res
@@ -813,13 +804,17 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "You must be at least 13 years old.",
+                            "You must be at least 13 years old."
                     });
             }
 
+            /* ------------------------------------------------
+               FIND EXISTING ACCOUNT
+            ------------------------------------------------ */
+
             let user =
                 await User.findOne({
-                    email,
+                    email
                 });
 
             if (
@@ -831,9 +826,13 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "An account with this email already exists.",
+                            "An account with this email already exists."
                     });
             }
+
+            /* ------------------------------------------------
+               CREATE OTP
+            ------------------------------------------------ */
 
             const otp =
                 generateOTP();
@@ -841,7 +840,7 @@ router.post(
             const otpExpires =
                 new Date(
                     Date.now() +
-                        OTP_EXPIRY_MS
+                    OTP_EXPIRY_MS
                 );
 
             const hashedPassword =
@@ -850,6 +849,10 @@ router.post(
                     12
                 );
 
+            /* ------------------------------------------------
+               SAVE ACCOUNT
+            ------------------------------------------------ */
+
             if (user) {
                 user.fullName =
                     fullName;
@@ -857,12 +860,14 @@ router.post(
                 user.password =
                     hashedPassword;
 
-                user.age = age;
+                user.age =
+                    age;
 
                 user.language =
                     language;
 
-                user.otp = otp;
+                user.otp =
+                    otp;
 
                 user.otpExpires =
                     otpExpires;
@@ -896,9 +901,13 @@ router.post(
 
                         otp,
 
-                        otpExpires,
+                        otpExpires
                     });
             }
+
+            /* ------------------------------------------------
+               SEND VERIFICATION EMAIL
+            ------------------------------------------------ */
 
             try {
                 await sendVerificationEmail(
@@ -910,12 +919,23 @@ router.post(
                     emailError.message
                 );
 
+                /*
+                 * Do not leave an active OTP if the email
+                 * was never successfully delivered.
+                 */
+                user.otp = null;
+
+                user.otpExpires =
+                    null;
+
+                await user.save();
+
                 return res
                     .status(503)
                     .json({
                         success: false,
                         message:
-                            "Account created, but the verification email could not be sent. Please try again.",
+                            "Account created, but the verification email could not be sent. Please try again."
                     });
             }
 
@@ -923,11 +943,14 @@ router.post(
                 .status(201)
                 .json({
                     success: true,
+
                     message:
                         "Registration successful. Check your Gmail for the verification code.",
+
                     email:
-                        user.email,
+                        user.email
                 });
+
         } catch (error) {
             console.error(
                 "[AUTH] Register error:",
@@ -939,7 +962,7 @@ router.post(
                 .json({
                     success: false,
                     message:
-                        "Registration failed.",
+                        "Registration failed."
                 });
         }
     }
@@ -960,8 +983,7 @@ router.post(
 
             const otp =
                 String(
-                    req.body?.otp ||
-                        ""
+                    req.body?.otp || ""
                 ).trim();
 
             if (
@@ -973,7 +995,7 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Email and OTP are required.",
+                            "Email and OTP are required."
                     });
             }
 
@@ -987,13 +1009,13 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Verification code must contain 6 digits.",
+                            "Verification code must contain 6 digits."
                     });
             }
 
             const user =
                 await User.findOne({
-                    email,
+                    email
                 });
 
             if (!user) {
@@ -1002,19 +1024,21 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Account not found.",
+                            "Account not found."
                     });
             }
 
             if (user.verified) {
                 return res.json({
                     success: true,
+
                     message:
                         "Email is already verified.",
+
                     user:
                         publicUser(
                             user
-                        ),
+                        )
                 });
             }
 
@@ -1027,7 +1051,22 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "No active verification code. Please request a new one.",
+                            "No active verification code. Please request a new one."
+                    });
+            }
+
+            if (
+                !(user.otpExpires instanceof Date) ||
+                Number.isNaN(
+                    user.otpExpires.getTime()
+                )
+            ) {
+                return res
+                    .status(400)
+                    .json({
+                        success: false,
+                        message:
+                            "Verification code is invalid. Please request a new one."
                     });
             }
 
@@ -1040,27 +1079,36 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "OTP has expired. Please request a new one.",
+                            "OTP has expired. Please request a new one."
                     });
             }
 
+            const storedOtp =
+                String(
+                    user.otp
+                ).trim();
+
             if (
-                user.otp !==
-                otp
+                storedOtp !== otp
             ) {
                 return res
                     .status(400)
                     .json({
                         success: false,
                         message:
-                            "Incorrect verification code.",
+                            "Incorrect verification code."
                     });
             }
+
+            /* ------------------------------------------------
+               SUCCESSFUL VERIFICATION
+            ------------------------------------------------ */
 
             user.verified =
                 true;
 
-            user.otp = null;
+            user.otp =
+                null;
 
             user.otpExpires =
                 null;
@@ -1069,13 +1117,16 @@ router.post(
 
             return res.json({
                 success: true,
+
                 message:
                     "Email verified successfully.",
+
                 user:
                     publicUser(
                         user
-                    ),
+                    )
             });
+
         } catch (error) {
             console.error(
                 "[AUTH] Verify OTP error:",
@@ -1087,7 +1138,7 @@ router.post(
                 .json({
                     success: false,
                     message:
-                        "Verification failed.",
+                        "Verification failed."
                 });
         }
     }
@@ -1112,13 +1163,13 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Email is required.",
+                            "Email is required."
                     });
             }
 
             const user =
                 await User.findOne({
-                    email,
+                    email
                 });
 
             if (!user) {
@@ -1127,7 +1178,7 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Account not found.",
+                            "Account not found."
                     });
             }
 
@@ -1137,18 +1188,34 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "This account is already verified.",
+                            "This account is already verified."
                     });
             }
 
-            user.otp =
+            /* ------------------------------------------------
+               SAVE OLD OTP IN CASE EMAIL FAILS
+            ------------------------------------------------ */
+
+            const oldOtp =
+                user.otp;
+
+            const oldOtpExpires =
+                user.otpExpires;
+
+            const newOtp =
                 generateOTP();
 
-            user.otpExpires =
+            const newOtpExpires =
                 new Date(
                     Date.now() +
-                        OTP_EXPIRY_MS
+                    OTP_EXPIRY_MS
                 );
+
+            user.otp =
+                newOtp;
+
+            user.otpExpires =
+                newOtpExpires;
 
             await user.save();
 
@@ -1162,20 +1229,34 @@ router.post(
                     emailError.message
                 );
 
+                /*
+                 * Restore the previous OTP if sending
+                 * the new one failed.
+                 */
+                user.otp =
+                    oldOtp;
+
+                user.otpExpires =
+                    oldOtpExpires;
+
+                await user.save();
+
                 return res
                     .status(503)
                     .json({
                         success: false,
                         message:
-                            "Verification email could not be sent.",
+                            "Verification email could not be sent. Please try again."
                     });
             }
 
             return res.json({
                 success: true,
+
                 message:
-                    "A new verification code has been sent.",
+                    "A new verification code has been sent."
             });
+
         } catch (error) {
             console.error(
                 "[AUTH] Resend OTP error:",
@@ -1187,7 +1268,7 @@ router.post(
                 .json({
                     success: false,
                     message:
-                        "Could not resend verification code.",
+                        "Could not resend verification code."
                 });
         }
     }
@@ -1208,8 +1289,7 @@ router.post(
 
             const password =
                 String(
-                    req.body?.password ||
-                        ""
+                    req.body?.password || ""
                 );
 
             const rememberMe =
@@ -1229,13 +1309,13 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Email and password are required.",
+                            "Email and password are required."
                     });
             }
 
             const user =
                 await User.findOne({
-                    email,
+                    email
                 });
 
             if (!user) {
@@ -1244,7 +1324,7 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Invalid email or password.",
+                            "Invalid email or password."
                     });
             }
 
@@ -1258,7 +1338,7 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "This account uses Google Login. Please continue with Google.",
+                            "This account uses Google Login. Please continue with Google."
                     });
             }
 
@@ -1268,7 +1348,7 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Invalid email or password.",
+                            "Invalid email or password."
                     });
             }
 
@@ -1284,7 +1364,7 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Invalid email or password.",
+                            "Invalid email or password."
                     });
             }
 
@@ -1294,7 +1374,7 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Please verify your email before logging in.",
+                            "Please verify your email before logging in."
                     });
             }
 
@@ -1306,13 +1386,16 @@ router.post(
 
             return res.json({
                 success: true,
+
                 message:
                     "Login successful.",
+
                 user:
                     publicUser(
                         user
-                    ),
+                    )
             });
+
         } catch (error) {
             console.error(
                 "[AUTH] Login error:",
@@ -1324,7 +1407,7 @@ router.post(
                 .json({
                     success: false,
                     message:
-                        "Login failed.",
+                        "Login failed."
                 });
         }
     }
@@ -1350,25 +1433,24 @@ router.get(
             }
 
             const authUrl =
-                googleClient.generateAuthUrl(
-                    {
-                        access_type:
-                            "offline",
+                googleClient.generateAuthUrl({
+                    access_type:
+                        "offline",
 
-                        prompt:
-                            "select_account",
+                    prompt:
+                        "select_account",
 
-                        scope: [
-                            "openid",
-                            "email",
-                            "profile",
-                        ],
-                    }
-                );
+                    scope: [
+                        "openid",
+                        "email",
+                        "profile"
+                    ]
+                });
 
             return res.redirect(
                 authUrl
             );
+
         } catch (error) {
             console.error(
                 "[AUTH] Google OAuth start error:",
@@ -1412,7 +1494,7 @@ router.get(
             const code =
                 String(
                     req.query?.code ||
-                        ""
+                    ""
                 ).trim();
 
             if (!code) {
@@ -1435,15 +1517,13 @@ router.get(
             }
 
             const ticket =
-                await googleClient.verifyIdToken(
-                    {
-                        idToken:
-                            tokens.id_token,
+                await googleClient.verifyIdToken({
+                    idToken:
+                        tokens.id_token,
 
-                        audience:
-                            GOOGLE_CLIENT_ID,
-                    }
-                );
+                    audience:
+                        GOOGLE_CLIENT_ID
+                });
 
             const payload =
                 ticket.getPayload();
@@ -1475,7 +1555,7 @@ router.get(
 
             let user =
                 await User.findOne({
-                    email,
+                    email
                 });
 
             if (!user) {
@@ -1492,15 +1572,17 @@ router.get(
                         language:
                             "English",
 
-                        password: null,
+                        password:
+                            null,
 
-                        verified: true,
+                        verified:
+                            true,
 
                         authProvider:
                             "google",
 
                         googleId:
-                            payload.sub,
+                            payload.sub
                     });
             } else {
                 if (
@@ -1544,6 +1626,7 @@ router.get(
             return res.redirect(
                 "/?google=success"
             );
+
         } catch (error) {
             console.error(
                 "[AUTH] Google OAuth callback error:",
@@ -1565,15 +1648,13 @@ router.post(
     "/google",
     async (req, res) => {
         try {
-            if (
-                !googleClient
-            ) {
+            if (!googleClient) {
                 return res
                     .status(503)
                     .json({
                         success: false,
                         message:
-                            "Google Login is not configured.",
+                            "Google Login is not configured."
                     });
             }
 
@@ -1586,20 +1667,18 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Google credential is missing.",
+                            "Google credential is missing."
                     });
             }
 
             const ticket =
-                await googleClient.verifyIdToken(
-                    {
-                        idToken:
-                            credential,
+                await googleClient.verifyIdToken({
+                    idToken:
+                        credential,
 
-                        audience:
-                            GOOGLE_CLIENT_ID,
-                    }
-                );
+                    audience:
+                        GOOGLE_CLIENT_ID
+                });
 
             const payload =
                 ticket.getPayload();
@@ -1614,7 +1693,7 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Google account could not be verified.",
+                            "Google account could not be verified."
                     });
             }
 
@@ -1633,13 +1712,13 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Please use a Gmail account.",
+                            "Please use a Gmail account."
                     });
             }
 
             let user =
                 await User.findOne({
-                    email,
+                    email
                 });
 
             if (!user) {
@@ -1656,15 +1735,17 @@ router.post(
                         language:
                             "English",
 
-                        password: null,
+                        password:
+                            null,
 
-                        verified: true,
+                        verified:
+                            true,
 
                         authProvider:
                             "google",
 
                         googleId:
-                            payload.sub,
+                            payload.sub
                     });
             } else {
                 if (
@@ -1677,7 +1758,7 @@ router.post(
                         .json({
                             success: false,
                             message:
-                                "This email is already connected to another Google account.",
+                                "This email is already connected to another Google account."
                         });
                 }
 
@@ -1719,13 +1800,16 @@ router.post(
 
             return res.json({
                 success: true,
+
                 message:
                     "Google Login successful.",
+
                 user:
                     publicUser(
                         user
-                    ),
+                    )
             });
+
         } catch (error) {
             console.error(
                 "[AUTH] Google Login error:",
@@ -1737,7 +1821,7 @@ router.post(
                 .json({
                     success: false,
                     message:
-                        "Google Login failed.",
+                        "Google Login failed."
                 });
         }
     }
@@ -1753,10 +1837,11 @@ router.get(
     async (req, res) => {
         return res.json({
             success: true,
+
             user:
                 publicUser(
                     req.user
-                ),
+                )
         });
     }
 );
@@ -1780,13 +1865,13 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Email is required.",
+                            "Email is required."
                     });
             }
 
             const user =
                 await User.findOne({
-                    email,
+                    email
                 });
 
             return res.json({
@@ -1802,8 +1887,9 @@ router.post(
 
                 authProvider:
                     user?.authProvider ||
-                    null,
+                    null
             });
+
         } catch (error) {
             console.error(
                 "[AUTH] Check email error:",
@@ -1815,7 +1901,7 @@ router.post(
                 .json({
                     success: false,
                     message:
-                        "Could not check email.",
+                        "Could not check email."
                 });
         }
     }
@@ -1840,24 +1926,25 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Email is required.",
+                            "Email is required."
                     });
             }
 
             const user =
                 await User.findOne({
-                    email,
+                    email
                 });
 
             /*
-               Do not reveal whether an email exists.
-            */
+             * Do not reveal whether an email exists.
+             */
 
             if (!user) {
                 return res.json({
                     success: true,
+
                     message:
-                        "If an account exists with that email, a reset link has been sent.",
+                        "If an account exists with that email, a reset link has been sent."
                 });
             }
 
@@ -1868,19 +1955,16 @@ router.post(
             ) {
                 return res.json({
                     success: true,
+
                     message:
-                        "This account uses Google Login. Please continue with Google.",
+                        "This account uses Google Login. Please continue with Google."
                 });
             }
 
             const resetToken =
                 crypto
-                    .randomBytes(
-                        32
-                    )
-                    .toString(
-                        "hex"
-                    );
+                    .randomBytes(32)
+                    .toString("hex");
 
             user.resetPasswordToken =
                 resetToken;
@@ -1888,7 +1972,7 @@ router.post(
             user.resetPasswordExpires =
                 new Date(
                     Date.now() +
-                        RESET_EXPIRY_MS
+                    RESET_EXPIRY_MS
                 );
 
             await user.save();
@@ -1899,6 +1983,10 @@ router.post(
                     resetToken
                 );
             } catch (emailError) {
+                /*
+                 * Remove unusable reset token.
+                 */
+
                 user.resetPasswordToken =
                     null;
 
@@ -1917,15 +2005,17 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Password reset email could not be sent. Please try again.",
+                            "Password reset email could not be sent. Please try again."
                     });
             }
 
             return res.json({
                 success: true,
+
                 message:
-                    "If an account exists with that email, a reset link has been sent.",
+                    "If an account exists with that email, a reset link has been sent."
             });
+
         } catch (error) {
             console.error(
                 "[AUTH] Forgot password error:",
@@ -1937,7 +2027,7 @@ router.post(
                 .json({
                     success: false,
                     message:
-                        "Could not process password reset.",
+                        "Could not process password reset."
                 });
         }
     }
@@ -1954,13 +2044,13 @@ router.post(
             const token =
                 String(
                     req.body?.token ||
-                        ""
+                    ""
                 ).trim();
 
             const password =
                 String(
                     req.body?.password ||
-                        ""
+                    ""
                 );
 
             if (
@@ -1972,33 +2062,31 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "Reset token and password are required.",
+                            "Reset token and password are required."
                     });
             }
 
             if (
-                password.length <
-                8
+                password.length < 8
             ) {
                 return res
                     .status(400)
                     .json({
                         success: false,
                         message:
-                            "Password must be at least 8 characters.",
+                            "Password must be at least 8 characters."
                     });
             }
 
             if (
-                password.length >
-                128
+                password.length > 128
             ) {
                 return res
                     .status(400)
                     .json({
                         success: false,
                         message:
-                            "Password is too long.",
+                            "Password is too long."
                     });
             }
 
@@ -2010,8 +2098,8 @@ router.post(
                     resetPasswordExpires:
                         {
                             $gt:
-                                new Date(),
-                        },
+                                new Date()
+                        }
                 });
 
             if (!user) {
@@ -2020,7 +2108,7 @@ router.post(
                     .json({
                         success: false,
                         message:
-                            "This reset link is invalid or has expired.",
+                            "This reset link is invalid or has expired."
                     });
             }
 
@@ -2045,14 +2133,17 @@ router.post(
             await user.save();
 
             /*
-               Clear any old session cookie.
-            */
+             * Do not automatically log the user in.
+             * They must explicitly log in with the new password.
+             */
 
             return res.json({
                 success: true,
+
                 message:
-                    "Password reset successfully. You can now log in.",
+                    "Password reset successfully. You can now log in."
             });
+
         } catch (error) {
             console.error(
                 "[AUTH] Reset password error:",
@@ -2064,7 +2155,7 @@ router.post(
                 .json({
                     success: false,
                     message:
-                        "Could not reset password.",
+                        "Could not reset password."
                 });
         }
     }
@@ -2087,14 +2178,14 @@ router.delete(
             const password =
                 String(
                     req.body?.password ||
-                        ""
+                    ""
                 );
 
             const confirmation =
                 String(
                     req.body
                         ?.confirmation ||
-                        ""
+                    ""
                 ).trim();
 
             if (
@@ -2106,7 +2197,7 @@ router.delete(
                     .json({
                         success: false,
                         message:
-                            "Type DELETE exactly to confirm account deletion.",
+                            "Type DELETE exactly to confirm account deletion."
                     });
             }
 
@@ -2114,8 +2205,7 @@ router.delete(
                 !email ||
                 email !==
                     normalizeEmail(
-                        req.user
-                            .email
+                        req.user.email
                     )
             ) {
                 return res
@@ -2123,34 +2213,30 @@ router.delete(
                     .json({
                         success: false,
                         message:
-                            "The account email does not match the authenticated session.",
+                            "The account email does not match the authenticated session."
                     });
             }
 
             const isGoogleAccount =
-                req.user
-                    .authProvider ===
+                req.user.authProvider ===
                     "google" &&
                 !req.user.password;
 
-            if (
-                !isGoogleAccount
-            ) {
+            if (!isGoogleAccount) {
                 if (!password) {
                     return res
                         .status(400)
                         .json({
                             success: false,
                             message:
-                                "Your current password is required.",
+                                "Your current password is required."
                         });
                 }
 
                 const correct =
                     await bcrypt.compare(
                         password,
-                        req.user
-                            .password ||
+                        req.user.password ||
                             ""
                     );
 
@@ -2160,14 +2246,14 @@ router.delete(
                         .json({
                             success: false,
                             message:
-                                "The password is incorrect.",
+                                "The password is incorrect."
                         });
                 }
             }
 
             await User.deleteOne({
                 _id:
-                    req.user._id,
+                    req.user._id
             });
 
             res.clearCookie(
@@ -2177,9 +2263,11 @@ router.delete(
 
             return res.json({
                 success: true,
+
                 message:
-                    "TrueAegis account deleted successfully.",
+                    "TrueAegis account deleted successfully."
             });
+
         } catch (error) {
             console.error(
                 "[AUTH] Delete account error:",
@@ -2191,7 +2279,7 @@ router.delete(
                 .json({
                     success: false,
                     message:
-                        "Could not delete the account.",
+                        "Could not delete the account."
                 });
         }
     }
@@ -2211,8 +2299,9 @@ router.post(
 
         return res.json({
             success: true,
+
             message:
-                "Logged out successfully.",
+                "Logged out successfully."
         });
     }
 );
@@ -2232,7 +2321,7 @@ router.get(
                 .json({
                     success: false,
                     message:
-                        "Google Login is not configured.",
+                        "Google Login is not configured."
                 });
         }
 
@@ -2246,7 +2335,7 @@ router.get(
                 GOOGLE_REDIRECT_URI,
 
             baseUrl:
-                BASE_URL,
+                BASE_URL
         });
     }
 );

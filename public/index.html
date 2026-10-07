@@ -21,11 +21,11 @@
          TRUEAEGIS SEO
     ====================================================== -->
 
-    <title>TrueAegis: AI-Powered Deepfake & Content Verification</title>
+    <title>TrueAegis — Digital Trust Intelligence Platform | AI Content Verification</title>
 
     <meta
         name="description"
-        content="TrueAegis is an AI-powered digital trust platform for deepfake detection, content verification, news analysis, and AI-assisted information checking."
+        content="TrueAegis is a digital trust intelligence platform for content verification, deepfake analysis, news analysis, and AI-assisted information checking."
     >
 
     <meta
@@ -38,6 +38,20 @@
         href="https://trueaegis.onrender.com/"
     >
 
+    <meta name="application-name" content="TrueAegis">
+    <meta name="author" content="TrueAegis">
+
+    <!-- Google site-name / entity context -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "TrueAegis",
+        "alternateName": "TrueAegis Digital Trust Intelligence Platform",
+        "url": "https://trueaegis.onrender.com/"
+    }
+    </script>
+
     <!-- =====================================================
          OPEN GRAPH — GOOGLE / SOCIAL SHARING
     ====================================================== -->
@@ -49,12 +63,12 @@
 
     <meta
         property="og:title"
-        content="TrueAegis: AI-Powered Deepfake & Content Verification"
+        content="TrueAegis — Digital Trust Intelligence Platform | AI Content Verification"
     >
 
     <meta
         property="og:description"
-        content="Analyze potentially manipulated media, verify online content, and investigate information with TrueAegis."
+        content="Analyze digital media, verify online content, investigate information, and use AI-powered tools with TrueAegis."
     >
 
     <meta
@@ -83,12 +97,12 @@
 
     <meta
         name="twitter:title"
-        content="TrueAegis: AI-Powered Deepfake & Content Verification"
+        content="TrueAegis — Digital Trust Intelligence Platform | AI Content Verification"
     >
 
     <meta
         name="twitter:description"
-        content="AI-powered tools for deepfake detection, content verification, and digital trust intelligence."
+        content="AI-powered content verification, deepfake analysis, news analysis, and digital trust intelligence."
     >
 
     <!-- =====================================================
@@ -8121,6 +8135,22 @@ that you want investigated...
 
         let otpExpiry = null;
 
+        // Keep only the pending registration email/expiry in sessionStorage.
+        // The server remains authoritative for OTP validity.
+        try {
+            const pending = JSON.parse(
+                sessionStorage.getItem("trueAegisPendingRegistration") || "null"
+            );
+            if (pending && pending.email) {
+                registrationData = {
+                    email: String(pending.email).trim().toLowerCase()
+                };
+                otpExpiry = Number(pending.otpExpiry) || null;
+            }
+        } catch (_) {
+            sessionStorage.removeItem("trueAegisPendingRegistration");
+        }
+
         let otpTimerInterval = null;
 
         let chatHistory = [];
@@ -8788,20 +8818,22 @@ Clearly distinguish:
 
 
                 registrationData = {
-
-                    email
-
+                    email: String(result.email || email).trim().toLowerCase()
                 };
-
 
                 otpExpiry =
                     Date.now() +
-                    (
-                        5 *
-                        60 *
-                        1000
-                    );
+                    (5 * 60 * 1000);
 
+                try {
+                    sessionStorage.setItem(
+                        "trueAegisPendingRegistration",
+                        JSON.stringify({
+                            email: registrationData.email,
+                            otpExpiry
+                        })
+                    );
+                } catch (_) {}
 
                 startOtpTimer();
 
@@ -9066,6 +9098,9 @@ Clearly distinguish:
                     otpTimerInterval
                 );
 
+                try {
+                    sessionStorage.removeItem("trueAegisPendingRegistration");
+                } catch (_) {}
 
                 showMessage(
                     "otpMessage",
@@ -9203,12 +9238,17 @@ Clearly distinguish:
 
                 otpExpiry =
                     Date.now() +
-                    (
-                        5 *
-                        60 *
-                        1000
-                    );
+                    (5 * 60 * 1000);
 
+                try {
+                    sessionStorage.setItem(
+                        "trueAegisPendingRegistration",
+                        JSON.stringify({
+                            email: registrationData.email,
+                            otpExpiry
+                        })
+                    );
+                } catch (_) {}
 
                 document
                     .getElementById(
